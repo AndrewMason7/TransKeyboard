@@ -258,7 +258,7 @@ final class GeminiTranscriptionClientTests: XCTestCase {
       text: "Hello",
       targetLanguage: TranslationLanguage.language(for: "es"),
       apiKey: "test-key",
-      model: "gemini-3.7-flash"
+      model: "gemini-3.5-flash"
     )
     XCTAssertEqual(result, "Hola")
     XCTAssertEqual(MockURLProtocol.startLoadingCount, 2)
@@ -347,7 +347,7 @@ final class GeminiTranscriptionClientTests: XCTestCase {
       let body = try XCTUnwrap(
         JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
       )
-      XCTAssertEqual(body["model"] as? String, "gemini-3.7-flash")
+      XCTAssertEqual(body["model"] as? String, "gemini-3.8-flash")
       XCTAssertEqual(body["store"] as? Bool, false)
 
       let input = try XCTUnwrap(body["input"] as? [[String: Any]])
@@ -373,12 +373,12 @@ final class GeminiTranscriptionClientTests: XCTestCase {
     let result = try await client.extractText(
       imageData: Data([0xFF, 0xD8, 0xFF]),
       apiKey: "test-key",
-      model: "gemini-3.7-flash"
+      model: "gemini-3.8-flash"
     )
     XCTAssertEqual(result, "Invoice 427")
   }
 
-  func testTranslationUsesGemini37TextInputAndLowThinking() async throws {
+  func testTranslationFallbackUsesGemini35TextInputAndLowThinking() async throws {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [MockURLProtocol.self]
     let client = GeminiTranscriptionClient(
@@ -390,7 +390,7 @@ final class GeminiTranscriptionClientTests: XCTestCase {
       let body = try XCTUnwrap(
         JSONSerialization.jsonObject(with: bodyData) as? [String: Any]
       )
-      XCTAssertEqual(body["model"] as? String, "gemini-3.7-flash")
+      XCTAssertEqual(body["model"] as? String, "gemini-3.5-flash")
       XCTAssertEqual(body["store"] as? Bool, false)
 
       let input = try XCTUnwrap(body["input"] as? [[String: Any]])
@@ -431,7 +431,7 @@ final class GeminiTranscriptionClientTests: XCTestCase {
       text: "Привет, как дела?",
       targetLanguage: .defaultLanguage,
       apiKey: "test-key",
-      model: "gemini-3.7-flash"
+      model: "gemini-3.5-flash"
     )
     XCTAssertEqual(result, "Hello, how are you?")
   }

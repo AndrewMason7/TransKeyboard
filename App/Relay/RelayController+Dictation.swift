@@ -47,49 +47,36 @@ extension RelayController {
     guard status != .transcribing, activeRequestID == nil else { return }
     markRelayActivityAndSuspendIdleShutdown()
 
-    let liveSession: GeminiLiveSpeechSession?
-    if configuration.liveStreamingEnabled {
-      let translationTarget = configuration.translationTarget
-      let mode: GeminiLiveSpeechSession.Mode =
-        action == .translate
-        ? .translate(targetLanguageCode: translationTarget.code)
-        : .transcribe
-      let session = GeminiLiveSpeechSession(
-        mode: mode,
-        progressHandler: { [weak self] text in
-          Task { @MainActor [weak self] in
-            self?.publishLivePreview(
-              text,
-              requestID: requestID,
-              action: action
-            )
-          }
+    let translationTarget = configuration.translationTarget
+    let mode = GeminiLiveSpeechSession.mode(
+      for: action,
+      targetLanguageCode: translationTarget.code
+    )
+    let liveSession = GeminiLiveSpeechSession(
+      mode: mode,
+      progressHandler: { [weak self] text in
+        Task { @MainActor [weak self] in
+          self?.publishLivePreview(
+            text,
+            requestID: requestID,
+            action: action
+          )
         }
-      )
-      liveSession = session
-      liveRequestID = requestID
-      activeLiveSession = session
-      lastLivePreviewAt = .distantPast
-      let apiKey = configuration.apiKey
-      liveConnectionTask = Task {
-        try await session.connect(credential: .apiKey(apiKey))
       }
-    } else {
-      liveSession = nil
+    )
+    liveRequestID = requestID
+    activeLiveSession = liveSession
+    lastLivePreviewAt = .distantPast
+    let apiKey = configuration.apiKey
+    liveConnectionTask = Task {
+      try await liveSession.connect(credential: .apiKey(apiKey))
     }
 
-    let chunkHandler: (@Sendable (Data) -> Void)?
-    let streamingFailureHandler: (@Sendable (String) -> Void)?
-    if let liveSession {
-      chunkHandler = { data in
-        liveSession.enqueueAudio(data)
-      }
-      streamingFailureHandler = { reason in
-        Task { await liveSession.invalidateAudioStream(reason) }
-      }
-    } else {
-      chunkHandler = nil
-      streamingFailureHandler = nil
+    let chunkHandler: @Sendable (Data) -> Void = { data in
+      liveSession.enqueueAudio(data)
+    }
+    let streamingFailureHandler: @Sendable (String) -> Void = { reason in
+      Task { await liveSession.invalidateAudioStream(reason) }
     }
 
     do {
@@ -106,17 +93,10 @@ extension RelayController {
       activeDictationAction = action
       activeStartedAt = startedAt
       let listeningMessage: String
-      if liveSession != nil {
-        listeningMessage =
-          action == .translate
-          ? "Streaming live translation… tap again when finished"
-          : "Streaming live transcription… tap the microphone again when finished"
-      } else {
-        listeningMessage =
-          action == .translate
-          ? "Listening for translation… tap again when finished"
-          : "Listening… tap the microphone again when finished"
-      }
+      listeningMessage =
+        action == .translate
+        ? "Streaming live translation… tap again when finished"
+        : "Streaming live transcription… tap the microphone again when finished"
       publish(
         .recording,
         message: listeningMessage,

@@ -10,51 +10,33 @@ extension ContentView {
             .font(.caption)
             .foregroundStyle(.white.opacity(0.55))
 
-          Toggle("Gemini Live streaming (Preview)", isOn: $configuration.liveStreamingEnabled)
-            .tint(.cyan)
-            .accessibilityIdentifier("live-streaming-toggle")
-
           Text(
-            configuration.liveStreamingEnabled
-              ? "Audio streams while you speak. Finish inserts the final result; Cancel stops streaming and discards the result. A temporary recording provides batch fallback."
-              : "Audio stays local until Finish, then uses the batch APIs."
+            "Dictate and Translate always use Gemini Live while you speak. Finish inserts the final result; Cancel stops streaming and discards it. A temporary recording provides fallback if Live fails."
           )
           .font(.caption)
           .foregroundStyle(.white.opacity(0.55))
           .fixedSize(horizontal: false, vertical: true)
 
           HStack {
-            Text(
-              configuration.liveStreamingEnabled
-                ? "Live transcription model"
-                : "Active transcription model")
+            Text("Live transcription model")
             Spacer(minLength: 8)
-            Text(
-              configuration.liveStreamingEnabled
-                ? configuration.liveTranscriptionModel
-                : configuration.transcriptionModel
-            )
-            .font(.caption.monospaced())
-            .foregroundStyle(.cyan)
-            .textSelection(.enabled)
+            Text(configuration.liveTranscriptionModel)
+              .font(.caption.monospaced())
+              .foregroundStyle(.cyan)
+              .textSelection(.enabled)
           }
           .accessibilityElement(children: .ignore)
           .accessibilityIdentifier("active-transcription-model")
           .accessibilityLabel("Active transcription model")
-          .accessibilityValue(
-            configuration.liveStreamingEnabled
-              ? configuration.liveTranscriptionModel
-              : configuration.transcriptionModel)
+          .accessibilityValue(configuration.liveTranscriptionModel)
 
-          if configuration.liveStreamingEnabled {
-            HStack {
-              Text("Fallback transcription model")
-              Spacer(minLength: 8)
-              Text(configuration.transcriptionModel)
-                .font(.caption.monospaced())
-                .foregroundStyle(.white.opacity(0.7))
-                .textSelection(.enabled)
-            }
+          HStack {
+            Text("Fallback transcription model")
+            Spacer(minLength: 8)
+            Text(configuration.transcriptionModel)
+              .font(.caption.monospaced())
+              .foregroundStyle(.white.opacity(0.7))
+              .textSelection(.enabled)
           }
 
           Divider()
@@ -87,27 +69,17 @@ extension ContentView {
           }
 
           HStack {
-            Text(
-              configuration.liveStreamingEnabled
-                ? "Live translation model"
-                : "Active translation model")
+            Text("Live translation model")
             Spacer(minLength: 8)
-            Text(
-              configuration.liveStreamingEnabled
-                ? configuration.liveTranslationModel
-                : configuration.translationModel
-            )
-            .font(.caption.monospaced())
-            .foregroundStyle(.cyan)
-            .textSelection(.enabled)
+            Text(configuration.liveTranslationModel)
+              .font(.caption.monospaced())
+              .foregroundStyle(.cyan)
+              .textSelection(.enabled)
           }
           .accessibilityElement(children: .ignore)
           .accessibilityIdentifier("active-translation-model")
           .accessibilityLabel("Active translation model")
-          .accessibilityValue(
-            configuration.liveStreamingEnabled
-              ? configuration.liveTranslationModel
-              : configuration.translationModel)
+          .accessibilityValue(configuration.liveTranslationModel)
 
           Text(
             "One completed dictation can contain multiple supported languages. They will all be translated into the selected output language."
@@ -124,16 +96,6 @@ extension ContentView {
             .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
             .accessibilityIdentifier("api-key-field")
 
-          TextField(
-            "Transcription model override",
-            text: $configuration.transcriptionModelOverride
-          )
-          .textInputAutocapitalization(.never)
-          .autocorrectionDisabled()
-          .padding(12)
-          .background(Color.black.opacity(0.22))
-          .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-
           HStack {
             Label(
               configuration.hasUsableAPIKey
@@ -145,8 +107,8 @@ extension ContentView {
             .foregroundStyle(.orange)
 
             Spacer()
-            Button("Use defaults") {
-              configuration.clearOverrides()
+            Button("Clear key override") {
+              configuration.clearAPIKeyOverride()
             }
             .font(.caption.weight(.semibold))
           }

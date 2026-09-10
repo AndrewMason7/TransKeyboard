@@ -21,6 +21,15 @@ actor GeminiLiveSpeechSession {
   static let transcriptionModel = "gemini-3.5-transcribe-live"
   static let translationModel = "gemini-3.5-live-translate-preview"
 
+  static func mode(
+    for action: RelayDictationAction,
+    targetLanguageCode: String
+  ) -> Mode {
+    action == .translate
+      ? .translate(targetLanguageCode: targetLanguageCode)
+      : .transcribe
+  }
+
   let mode: Mode
   let progressHandler: (@Sendable (String) -> Void)?
   let socketFactory: SocketFactory

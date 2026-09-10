@@ -63,7 +63,7 @@ The project instead keeps one source of truth for each process and divides its i
 
 `GeminiLiveSpeechSession` is an actor. It serializes socket setup, queued audio, transcript events, Finish, Cancel, and close. Interim events are presentation-only. Final input transcription is authoritative for dictation. Finish drains the audio stream before sending end-of-activity messages, and it rejects a known-stale final when likely speech arrived after that final.
 
-The local WAV remains available until the operation resolves. A non-cancellation Live failure uses the complete WAV with `gemini-3.5-transcribe`. Translation then uses the configured text model. Cancellation never activates fallback.
+The local WAV remains available until the operation resolves. A non-cancellation Live failure uses the complete WAV with `gemini-3.5-transcribe`; translation fallback then uses `gemini-3.5-flash`. `gemini-3.8-flash` is reserved for OCR. Cancellation never activates fallback.
 
 ## Recovery model
 

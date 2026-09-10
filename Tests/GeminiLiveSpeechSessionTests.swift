@@ -113,6 +113,17 @@ private final class EndpointCapture: @unchecked Sendable {
 }
 
 final class GeminiLiveSpeechSessionTests: XCTestCase {
+  func testKeyboardActionsSelectTheirDedicatedLiveModes() {
+    XCTAssertEqual(
+      GeminiLiveSpeechSession.mode(for: .transcribe, targetLanguageCode: "pl"),
+      .transcribe
+    )
+    XCTAssertEqual(
+      GeminiLiveSpeechSession.mode(for: .translate, targetLanguageCode: "pl"),
+      .translate(targetLanguageCode: "pl")
+    )
+  }
+
   func testTranscriptionSetupUsesDocumentedLiveModelAndManualPushToTalk() throws {
     let message = GeminiLiveSpeechSession.setupMessage(for: .transcribe)
     let setup = try XCTUnwrap(message["setup"] as? [String: Any])

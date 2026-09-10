@@ -37,11 +37,7 @@ extension ContentView {
         HStack {
           statusPill
           Spacer()
-          Text(
-            configuration.liveStreamingEnabled
-              ? configuration.liveTranscriptionModel
-              : configuration.transcriptionModel
-          )
+          Text(configuration.liveTranscriptionModel)
           .font(.caption.monospaced())
           .foregroundStyle(.white.opacity(0.5))
           .lineLimit(1)
@@ -62,9 +58,7 @@ extension ContentView {
             .fixedSize(horizontal: false, vertical: true)
           if relay.isRelayRunning {
             Text(
-              configuration.liveStreamingEnabled
-                ? "The microphone session stays armed while the relay is on. During Dictate, audio streams to Gemini and is also saved temporarily for fallback. It turns off after 2 minutes without dictation."
-                : "The microphone session stays armed while the relay is on. Audio is saved only during Dictate and sent only after Finish. It turns off after 2 minutes without dictation."
+              "The microphone session stays armed while the relay is on. During Dictate or Translate, audio streams to Gemini Live and is also saved temporarily for fallback. It turns off after 2 minutes without dictation."
             )
             .font(.caption)
             .foregroundStyle(.white.opacity(0.5))

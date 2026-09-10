@@ -4,9 +4,7 @@ import UIKit
 extension ContentView {
   var privacyFooter: some View {
     Label(
-      configuration.liveStreamingEnabled
-        ? "While the relay is on, iOS shows microphone access because the audio session stays armed. After Dictate, microphone audio streams to Google Gemini; Finish inserts the result, while Cancel stops streaming and discards it. A local fallback recording is deleted after success, or kept on this iPhone for Retry after a failure."
-        : "While the relay is on, iOS shows microphone access because the audio session stays armed. Only audio captured after Dictate and completed with Finish—and images you explicitly choose—are sent to Google Gemini. Failed recordings stay on this iPhone for Retry; successful recordings are deleted.",
+      "While the relay is on, iOS shows microphone access because the audio session stays armed. After Dictate or Translate, microphone audio streams to Google Gemini Live; Finish inserts the result, while Cancel stops streaming and discards it. A local fallback recording is deleted after success, or kept on this iPhone for Retry after a failure.",
       systemImage: "lock.shield"
     )
     .font(.caption)

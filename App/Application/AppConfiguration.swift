@@ -5,9 +5,6 @@ import Foundation
 final class AppConfiguration: ObservableObject {
   private enum Key {
     static let apiKeyOverride = "configuration.gemini-api-key-override"
-    static let transcriptionModelOverride = "configuration.gemini-transcription-model-override"
-    static let liveStreamingEnabled = "configuration.gemini-live-streaming-enabled"
-    static let translationEnabled = TranslationPreferenceKey.enabled
     static let translationTargetCode = TranslationPreferenceKey.targetCode
   }
 
@@ -36,26 +33,6 @@ final class AppConfiguration: ObservableObject {
   }
 
   @Published private(set) var credentialPersistenceWarning: String?
-
-  @Published var transcriptionModelOverride: String {
-    didSet {
-      defaults.set(transcriptionModelOverride, forKey: Key.transcriptionModelOverride)
-    }
-  }
-
-  @Published var liveStreamingEnabled: Bool {
-    didSet {
-      defaults.set(liveStreamingEnabled, forKey: Key.liveStreamingEnabled)
-    }
-  }
-
-  @Published var translationEnabled: Bool {
-    didSet {
-      defaults.set(translationEnabled, forKey: Key.translationEnabled)
-      sharedDefaults.set(translationEnabled, forKey: Key.translationEnabled)
-      sharedDefaults.synchronize()
-    }
-  }
 
   @Published var translationTargetCode: String {
     didSet {
@@ -88,22 +65,17 @@ final class AppConfiguration: ObservableObject {
     self.embeddedOCRModel = Self.nonEmptyBundleString(
       bundle,
       key: "GeminiDefaultOCRModel",
-      fallback: "gemini-3.7-flash"
+      fallback: "gemini-3.8-flash"
     )
     self.embeddedTranslationModel = Self.nonEmptyBundleString(
       bundle,
       key: "GeminiDefaultTranslationModel",
-      fallback: "gemini-3.7-flash"
+      fallback: "gemini-3.5-flash"
     )
     let legacyOverride = defaults.string(forKey: Key.apiKeyOverride) ?? ""
     let securedOverride = credentialStore.loadAPIKey()
     self.apiKeyOverride = securedOverride.isEmpty ? legacyOverride : securedOverride
     self.credentialPersistenceWarning = nil
-    self.transcriptionModelOverride = defaults.string(forKey: Key.transcriptionModelOverride) ?? ""
-    self.liveStreamingEnabled = defaults.object(forKey: Key.liveStreamingEnabled) as? Bool ?? true
-    // Translation is a first-class keyboard action. Older builds persisted
-    // false here and accidentally hid the button entirely.
-    self.translationEnabled = true
     let savedTargetCode =
       defaults.string(forKey: Key.translationTargetCode)
       ?? sharedDefaults.string(forKey: Key.translationTargetCode)
@@ -120,7 +92,6 @@ final class AppConfiguration: ObservableObject {
     } else {
       defaults.removeObject(forKey: Key.apiKeyOverride)
     }
-    sharedDefaults.set(self.translationEnabled, forKey: Key.translationEnabled)
     sharedDefaults.set(self.translationTargetCode, forKey: Key.translationTargetCode)
     sharedDefaults.synchronize()
   }
@@ -131,8 +102,7 @@ final class AppConfiguration: ObservableObject {
   }
 
   var transcriptionModel: String {
-    let override = transcriptionModelOverride.trimmingCharacters(in: .whitespacesAndNewlines)
-    return override.isEmpty ? embeddedTranscriptionModel : override
+    embeddedTranscriptionModel
   }
 
   var liveTranscriptionModel: String {
@@ -173,9 +143,8 @@ final class AppConfiguration: ObservableObject {
     return "Extractable Debug credential configured — personal-device use only"
   }
 
-  func clearOverrides() {
+  func clearAPIKeyOverride() {
     apiKeyOverride = ""
-    transcriptionModelOverride = ""
   }
 
   private static func nonEmptyBundleString(

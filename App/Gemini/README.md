@@ -2,14 +2,14 @@
 
 This folder contains the provider-specific code. Audio capture, recovery, keyboard messaging, and UI live outside it so the Gemini protocol can be read independently.
 
-## Batch transcription
+## Batch fallback and OCR
 
-- `Batch/GeminiTranscriptionClient.swift` creates Interactions API requests for audio transcription, translation, and image text extraction. It validates credentials and inline payload limits before networking.
+- `Batch/GeminiTranscriptionClient.swift` creates Interactions API requests for `gemini-3.5-transcribe` fallback, `gemini-3.5-flash` fallback translation, and `gemini-3.8-flash` image text extraction. It validates credentials and inline payload limits before networking.
 - `Batch/GeminiInteractionResponse.swift` defines service errors and parses completed interaction steps into plain text.
 
 Batch audio is a complete WAV produced by `App/Audio`. Requests set `store: false`. The inline size limit is deliberately below common transport limits; production applications should use the Files API or a backend for larger recordings.
 
-## Live transcription
+## Live transcription and translation
 
 - `Live/GeminiLiveTransport.swift` defines credentials and the small socket abstraction used by production code and tests.
 - `Live/GeminiLiveSpeechSession.swift` owns actor state, connection setup, and the bounded audio stream.
@@ -19,6 +19,8 @@ Batch audio is a complete WAV produced by `App/Audio`. Requests set `store: fals
 - `Live/GeminiLiveTimeout.swift` races individual async operations against bounded timeouts without trapping the app process.
 
 The socket abstraction makes protocol behavior testable without a real network. `Tests/GeminiLiveSpeechSessionTests.swift` covers setup schema, ordering, transcript merging, stale-final rejection, cancellation, and translation completion.
+
+Every keyboard Dictate or Translate request creates a Live session. Dictate uses `gemini-3.5-transcribe-live`; Translate uses `gemini-3.5-live-translate-preview`. Batch code runs only after a non-cancellation Live failure or an explicit retry of a saved recording.
 
 ## Authentication boundary
 

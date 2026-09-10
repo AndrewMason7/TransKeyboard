@@ -38,12 +38,19 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     super.init(frame: frame)
     clipsToBounds = false
     rootStack.axis = .vertical
+    rootStack.alignment = .fill
     rootStack.distribution = .fillEqually
     rootStack.spacing = 6
     rootStack.translatesAutoresizingMaskIntoConstraints = false
     addSubview(rootStack)
     let fillWidth = rootStack.widthAnchor.constraint(equalTo: widthAnchor, constant: -8)
-    fillWidth.priority = .defaultHigh
+    // UIInputViewController asks its content for a compressed fitting size before
+    // the extension receives its final bounds. The row containers have no
+    // intrinsic width, so a 750-priority fill constraint can be discarded during
+    // that pass and leave the complete key grid collapsed around its center.
+    // Keep the 760-point iPad cap required, but make filling every narrower host
+    // width effectively mandatory.
+    fillWidth.priority = UILayoutPriority(999)
     NSLayoutConstraint.activate([
       rootStack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 4),
       rootStack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4),

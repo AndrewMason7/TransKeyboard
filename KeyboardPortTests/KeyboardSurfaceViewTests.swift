@@ -68,6 +68,20 @@ final class KeyboardSurfaceViewTests: XCTestCase {
     XCTAssertFalse(allSubviews(of: surface).contains(where: \.hasAmbiguousLayout))
   }
 
+  func testRenderedPhoneLayoutFillsAvailableWidth() throws {
+    let (surface, _) = makeSurface()
+    surface.layoutIfNeeded()
+
+    let q = try button("keyboard-key-q", in: surface)
+    let p = try button("keyboard-key-p", in: surface)
+    let qFrame = q.convert(q.bounds, to: surface)
+    let pFrame = p.convert(p.bounds, to: surface)
+
+    XCTAssertGreaterThan(qFrame.width, 25)
+    XCTAssertLessThan(qFrame.minX, 10)
+    XCTAssertGreaterThan(pFrame.maxX, 380)
+  }
+
   func testWideLayoutKeepsTypingKeysAtAUsableSize() throws {
     let surface = KeyboardSurfaceView(frame: CGRect(x: 0, y: 0, width: 1_024, height: 260))
     surface.layoutIfNeeded()

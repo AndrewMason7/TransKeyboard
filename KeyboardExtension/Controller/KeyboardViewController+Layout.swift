@@ -14,6 +14,7 @@ extension KeyboardViewController {
     keyboardHeightConstraint = height
 
     rootStack.axis = .vertical
+    rootStack.alignment = .fill
     rootStack.spacing = 7
     rootStack.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(rootStack)
@@ -30,6 +31,7 @@ extension KeyboardViewController {
     makeRecordingPanel()
 
     typingStack.axis = .vertical
+    typingStack.alignment = .fill
     typingStack.translatesAutoresizingMaskIntoConstraints = false
     keyboardSurface.translatesAutoresizingMaskIntoConstraints = false
     typingStack.addArrangedSubview(keyboardSurface)

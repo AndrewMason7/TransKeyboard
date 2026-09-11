@@ -14,6 +14,7 @@ Validation:
 - No new local crash reports appeared.
 - Production runtime-trap audit passed; audio and handoff lifecycle paths were also inspected for forced unwraps and unsafe accesses.
 - Signed device build succeeded and was installed under the existing bundle and App Group identifiers, preserving app data and credentials.
-- Initial device launch was denied because the phone was locked. Physical microphone recovery and the complete keyboard round trip remain to be verified after unlock; Simulator checks cannot establish their reliability.
+- After the phone was unlocked, the installed app launched successfully at 14:39 Eastern and remained alive as PID 15210. Shared relay state first reported ready, then handled two new commands (sequence 572 to 574), produced a new result (216 to 217), and reported `Live transcript inserted — ready`. No new GeminiVoice crash reports appeared after this physical-device dictation.
+- This verifies microphone startup and one completed dictation on the phone. The intermittent audio-route recovery failure and cold keyboard-to-app-to-keyboard handoff have not yet been reproduced with the corrected build; successful startup alone does not establish that every route transition is fixed.
 
 Crash report copies and build/test logs are in `/tmp/gv-device-crashes` and `/tmp/gv-*.log` on the development Mac. Raw device reports are not committed.

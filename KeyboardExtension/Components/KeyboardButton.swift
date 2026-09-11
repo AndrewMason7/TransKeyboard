@@ -16,6 +16,14 @@ final class KeyboardButton: UIButton {
     return bounds.insetBy(dx: -3, dy: -3).contains(point)
   }
 
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    if bounds.width > 0 && bounds.height > 0 {
+      let radius = layer.cornerRadius > 0 ? layer.cornerRadius : 6
+      layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: radius).cgPath
+    }
+  }
+
   private func updateInteractionAppearance(animated: Bool) {
     let changes = {
       self.alpha = self.isEnabled ? (self.isHighlighted ? 0.72 : 1) : 0.38

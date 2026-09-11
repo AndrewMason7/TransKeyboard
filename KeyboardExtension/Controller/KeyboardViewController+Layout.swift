@@ -48,7 +48,14 @@ extension KeyboardViewController {
   }
 
   var preferredKeyboardHeight: CGFloat {
-    let contentHeight: CGFloat = traitCollection.verticalSizeClass == .compact ? 272 : 292
+    let contentHeight: CGFloat
+    if traitCollection.horizontalSizeClass == .regular {
+      contentHeight = 320
+    } else if traitCollection.verticalSizeClass == .compact {
+      contentHeight = 216
+    } else {
+      contentHeight = 274
+    }
     let resultBannerHeight: CGFloat = insertLatestButton.isHidden ? 0 : 49
     return contentHeight + resultBannerHeight + view.safeAreaInsets.bottom
   }

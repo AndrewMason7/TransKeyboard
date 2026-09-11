@@ -45,13 +45,8 @@ private actor MockGeminiLiveSocket: GeminiLiveSocket {
     }
   }
 
-  func sentJSONObjects() throws -> [[String: Any]] {
-    try sentTexts.map { text in
-      let data = Data(text.utf8)
-      return try XCTUnwrap(
-        JSONSerialization.jsonObject(with: data) as? [String: Any]
-      )
-    }
+  func sentRawTexts() -> [String] {
+    sentTexts
   }
 
   func hasSentAudioStreamEnd() -> Bool {
@@ -337,7 +332,13 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
     let result = try await finishTask.value
     XCTAssertEqual(result, "A final transcript.")
 
-    let messages = try await socket.sentJSONObjects()
+    let rawMessages = await socket.sentRawTexts()
+    let messages: [[String: Any]] = try rawMessages.map { text in
+      let data = Data(text.utf8)
+      return try XCTUnwrap(
+        JSONSerialization.jsonObject(with: data) as? [String: Any]
+      )
+    }
     XCTAssertEqual(messages.count, 4)
     XCTAssertNotNil(messages[0]["setup"])
     XCTAssertNotNil(

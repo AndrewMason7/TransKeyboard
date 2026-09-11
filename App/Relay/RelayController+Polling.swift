@@ -5,12 +5,10 @@ import UIKit
 
 extension RelayController {
   func beginPolling() {
-    let timer = DispatchSource.makeTimerSource(queue: pollingQueue)
+    let timer = DispatchSource.makeTimerSource(queue: .main)
     timer.schedule(deadline: .now(), repeating: .milliseconds(200), leeway: .milliseconds(40))
     timer.setEventHandler { [weak self] in
-      Task { @MainActor [weak self] in
-        self?.pollRelayStore()
-      }
+      self?.pollRelayStore()
     }
     pollTimer = timer
     timer.resume()

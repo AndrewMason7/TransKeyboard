@@ -82,6 +82,41 @@ final class KeyboardSurfaceViewTests: XCTestCase {
     XCTAssertGreaterThan(pFrame.maxX, 380)
   }
 
+  func testKeySizesAreRegularAcrossRows() throws {
+    let (surface, _) = makeSurface()
+    surface.layoutIfNeeded()
+
+    let q = try button("keyboard-key-q", in: surface)
+    let a = try button("keyboard-key-a", in: surface)
+    let s = try button("keyboard-key-s", in: surface)
+    let z = try button("keyboard-key-z", in: surface)
+    let dot = try button("keyboard-key-.", in: surface)
+    let shift = try button("keyboard-shift-key", in: surface)
+    let backspace = try button("keyboard-delete-key", in: surface)
+
+    // Letter keys across rows 1, 2, and 3 must have equal width
+    XCTAssertEqual(q.bounds.width, a.bounds.width, accuracy: 0.5)
+    XCTAssertEqual(q.bounds.width, z.bounds.width, accuracy: 0.5)
+    // Single-character punctuation on the bottom row must also have regular base key width
+    XCTAssertEqual(q.bounds.width, dot.bounds.width, accuracy: 0.5)
+
+    let qFrame = q.convert(q.bounds, to: surface)
+    let aFrame = a.convert(a.bounds, to: surface)
+    let sFrame = s.convert(s.bounds, to: surface)
+    let zFrame = z.convert(z.bounds, to: surface)
+    let shiftFrame = shift.convert(shift.bounds, to: surface)
+    let backspaceFrame = backspace.convert(backspace.bounds, to: surface)
+
+    // Row 2 ('A') is indented relative to Row 1 ('Q')
+    XCTAssertGreaterThan(aFrame.minX, qFrame.minX)
+
+    // 'Z' aligns under 'S'
+    XCTAssertEqual(zFrame.minX, sFrame.minX, accuracy: 1.0)
+
+    // Shift and Backspace are symmetrically sized
+    XCTAssertEqual(shiftFrame.width, backspaceFrame.width, accuracy: 1.0)
+  }
+
   func testWideLayoutKeepsTypingKeysAtAUsableSize() throws {
     let surface = KeyboardSurfaceView(frame: CGRect(x: 0, y: 0, width: 1_024, height: 260))
     surface.layoutIfNeeded()
@@ -107,6 +142,64 @@ final class KeyboardSurfaceViewTests: XCTestCase {
 
     XCTAssertEqual(callout.selectedText, "o")
     XCTAssertLessThanOrEqual(callout.frame.maxX, container.bounds.maxX - 4)
+  }
+
+  func testShiftUpdatePreservesButtonIdentityWithoutReallocatingViews() throws {
+    let (surface, _) = makeSurface()
+    let initialQ = try button("keyboard-key-q", in: surface)
+
+    surface.activate(.shift)
+
+    let uppercaseQ = try button("keyboard-key-Q", in: surface)
+    // The exact same button instance must be updated in-place (no allocation/teardown)
+    XCTAssertTrue(initialQ === uppercaseQ)
+
+    // Second tap within doubleTapInterval enters caps lock (letters remain uppercase)
+    surface.activate(.shift)
+    XCTAssertTrue(surface.interactionState.isCapsLocked)
+    let capsQ = try button("keyboard-key-Q", in: surface)
+    XCTAssertTrue(initialQ === capsQ)
+
+    // Third tap exits caps lock back to lowercase
+    surface.activate(.shift)
+    let lowercaseQ = try button("keyboard-key-q", in: surface)
+    XCTAssertTrue(initialQ === lowercaseQ)
+  }
+
+  func testAlternateCalloutWithAdversarialPointsDoesNotCrash() {
+    let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 220))
+    let key = UIView(frame: CGRect(x: 100, y: 90, width: 38, height: 44))
+    let callout = KeyboardAlternateCalloutView()
+    container.addSubview(key)
+
+    let options = ["a", "à", "á", "â", "ä"]
+    callout.show(options: options, above: key, in: container, anchoredToTrailingEdge: false)
+
+    // Normal selection
+    callout.updateSelection(at: CGPoint(x: 50, y: 20), options: options)
+    XCTAssertNotNil(callout.selectedText)
+
+    // Adversarial inputs: NaN, infinity, extreme negative, extreme positive
+    callout.updateSelection(at: CGPoint(x: CGFloat.nan, y: 0), options: options)
+    callout.updateSelection(at: CGPoint(x: CGFloat.infinity, y: 0), options: options)
+    callout.updateSelection(at: CGPoint(x: -999999, y: 0), options: options)
+    callout.updateSelection(at: CGPoint(x: 999999, y: 0), options: options)
+
+    // Empty options guard
+    callout.updateSelection(at: CGPoint(x: 10, y: 10), options: [])
+    XCTAssertNotNil(callout)
+  }
+
+  func testInputCalloutDoesNotCrashInNarrowContainer() {
+    let container = UIView(frame: CGRect(x: 0, y: 0, width: 40, height: 220))
+    let key = UIView(frame: CGRect(x: 5, y: 90, width: 30, height: 44))
+    let callout = KeyboardInputCalloutView()
+    container.addSubview(key)
+
+    callout.show(text: "A", above: key, in: container)
+    XCTAssertFalse(callout.isHidden)
+    callout.hide()
+    XCTAssertTrue(callout.isHidden)
   }
 
   private func makeSurface() -> (KeyboardSurfaceView, DelegateSpy) {

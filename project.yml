@@ -10,7 +10,7 @@ options:
 settings:
   base:
     CODE_SIGN_STYLE: Automatic
-    SWIFT_VERSION: "5.0"
+    SWIFT_VERSION: "6.0"
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     SUPPORTS_MACCATALYST: NO

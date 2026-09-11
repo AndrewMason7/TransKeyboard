@@ -39,7 +39,9 @@ final class KeyboardInputCalloutView: UIView {
     label.text = text
     let keyFrame = key.convert(key.bounds, to: container)
     let width = max(52, keyFrame.width + 16)
-    let centerX = min(max(keyFrame.midX, width / 2 + 3), container.bounds.width - width / 2 - 3)
+    let minX = width / 2 + 3
+    let maxX = max(minX, container.bounds.width - width / 2 - 3)
+    let centerX = min(max(keyFrame.midX, minX), maxX)
     frame = CGRect(
       x: centerX - width / 2,
       y: max(2, keyFrame.minY - 63),
@@ -51,11 +53,12 @@ final class KeyboardInputCalloutView: UIView {
       container.addSubview(self)
     }
     container.bringSubviewToFront(self)
+    isHidden = false
     alpha = 1
   }
 
   func hide() {
-    removeFromSuperview()
+    isHidden = true
   }
 }
 
@@ -98,6 +101,7 @@ final class KeyboardAlternateCalloutView: UIView {
     in container: UIView,
     anchoredToTrailingEdge: Bool
   ) {
+    guard !options.isEmpty else { return }
     stack.arrangedSubviews.forEach {
       stack.removeArrangedSubview($0)
       $0.removeFromSuperview()
@@ -117,7 +121,7 @@ final class KeyboardAlternateCalloutView: UIView {
     let keyFrame = key.convert(key.bounds, to: container)
     let width = min(container.bounds.width - 8, max(58, CGFloat(options.count) * 36 + 10))
     let idealX = anchoredToTrailingEdge ? keyFrame.maxX - width : keyFrame.minX
-    let x = min(max(idealX, 4), container.bounds.width - width - 4)
+    let x = min(max(idealX, 4), max(4, container.bounds.width - width - 4))
     frame = CGRect(
       x: x,
       y: max(2, keyFrame.minY - 57),
@@ -129,28 +133,34 @@ final class KeyboardAlternateCalloutView: UIView {
       container.addSubview(self)
     }
     container.bringSubviewToFront(self)
+    isHidden = false
+    alpha = 1
     select(index: anchoredToTrailingEdge ? options.count - 1 : 0, options: options)
   }
 
   func updateSelection(at point: CGPoint, options: [String]) {
     guard !options.isEmpty, bounds.width > 0 else { return }
     let localPoint = convert(point, from: superview)
+    guard localPoint.x.isFinite else { return }
     let itemWidth = bounds.width / CGFloat(options.count)
-    let index = min(options.count - 1, max(0, Int(localPoint.x / itemWidth)))
+    guard itemWidth > 0 else { return }
+    let rawIndex = Int(floor(localPoint.x / itemWidth))
+    let index = min(options.count - 1, max(0, rawIndex))
     select(index: index, options: options)
   }
 
   func hide() {
     selectedText = nil
-    removeFromSuperview()
+    isHidden = true
   }
 
   private func select(index: Int, options: [String]) {
-    guard options.indices.contains(index) else { return }
+    guard options.indices.contains(index), labels.indices.contains(index) else { return }
     selectedText = options[index]
     for (labelIndex, label) in labels.enumerated() {
-      label.backgroundColor = labelIndex == index ? .systemBlue : .clear
-      label.textColor = labelIndex == index ? .white : .label
+      let isSelected = labelIndex == index
+      label.backgroundColor = isSelected ? .systemBlue : .clear
+      label.textColor = isSelected ? .white : .label
     }
   }
 }

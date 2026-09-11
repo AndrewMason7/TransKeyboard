@@ -2,7 +2,7 @@
 set -euo pipefail
 
 project_root="${0:A:h:h}"
-export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+export DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 
 cd "$project_root"
 xcodegen_bin="${XCODEGEN_BIN:-$(command -v xcodegen || true)}"

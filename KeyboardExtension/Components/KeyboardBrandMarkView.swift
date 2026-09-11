@@ -54,9 +54,19 @@ final class KeyboardBrandMarkView: UIView {
     tapHandler?()
   }
 
+  private var isPressed = false
+
   override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
     super.touchesBegan(touches, with: event)
     setPressed(true)
+  }
+
+  override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+    super.touchesMoved(touches, with: event)
+    if let touch = touches.first {
+      let location = touch.location(in: self)
+      setPressed(bounds.contains(location))
+    }
   }
 
   override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -70,6 +80,8 @@ final class KeyboardBrandMarkView: UIView {
   }
 
   private func setPressed(_ pressed: Bool) {
+    guard isPressed != pressed else { return }
+    isPressed = pressed
     UIView.animate(withDuration: pressed ? 0.05 : 0.15) {
       self.alpha = pressed ? 0.6 : 1
       self.transform = pressed ? CGAffineTransform(scaleX: 0.94, y: 0.94) : .identity
@@ -79,7 +91,11 @@ final class KeyboardBrandMarkView: UIView {
   override func layoutSubviews() {
     super.layoutSubviews()
     gradientLayer.frame = bounds
-    gradientLayer.cornerRadius = min(bounds.width, bounds.height) * 0.32
+    let cornerRadius = min(bounds.width, bounds.height) * 0.32
+    gradientLayer.cornerRadius = cornerRadius
+    if bounds.width > 0 && bounds.height > 0 {
+      layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: cornerRadius).cgPath
+    }
   }
 
   func setStatus(_ text: String, accentColor: UIColor) {

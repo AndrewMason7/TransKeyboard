@@ -44,7 +44,7 @@ extension KeyboardViewController {
     /// route first, then the responder-chain fallback that current iOS
     /// releases still honor for this extension point. `completion` runs on
     /// the main actor.
-    func openContainingAppURL(_ url: URL, completion: @escaping (Bool) -> Void) {
+    func openContainingAppURL(_ url: URL, completion: @escaping @Sendable @MainActor (Bool) -> Void) {
       guard let extensionContext else {
         completion(false)
         return
@@ -67,7 +67,7 @@ extension KeyboardViewController {
     /// opener as a personal-device fallback.
     func openContainingAppThroughResponderChain(
       _ url: URL,
-      completion: @escaping (Bool) -> Void
+      completion: @escaping @Sendable @MainActor (Bool) -> Void
     ) {
       let selector = NSSelectorFromString("openURL:options:completionHandler:")
       guard let applicationClass = NSClassFromString("UIApplication") else {
@@ -97,7 +97,7 @@ extension KeyboardViewController {
               "GV_HANDOFF_LAUNCH_PATH modern-openURL result=%@",
               opened ? "true" : "false"
             )
-            DispatchQueue.main.async { completion(opened) }
+            Task { @MainActor in completion(opened) }
           }
           openURL(candidate, selector, url as NSURL, NSDictionary(), completionBlock)
           return

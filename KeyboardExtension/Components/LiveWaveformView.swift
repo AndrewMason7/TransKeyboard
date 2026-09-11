@@ -43,7 +43,7 @@ final class LiveWaveformView: UIView {
   }
 
   func setLevel(_ level: CGFloat, active: Bool) {
-    let clamped = min(max(level, 0), 1)
+    let clamped = level.isFinite ? min(max(level, 0), 1) : 0
     for (index, constraint) in heightConstraints.enumerated() {
       let idleMotion = active ? CGFloat((index % 3) + 1) * 2 : 0
       constraint.constant = 12 + idleMotion + (62 * clamped * multipliers[index])

@@ -5,7 +5,7 @@ import UIKit
 // THIRD_PARTY_NOTICES.md.
 
 final class KeyboardKeyButton: UIButton {
-  let key: KeyboardLayoutKey
+  private(set) var key: KeyboardLayoutKey
 
   init(key: KeyboardLayoutKey) {
     self.key = key
@@ -20,6 +20,17 @@ final class KeyboardKeyButton: UIButton {
     setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     setContentHuggingPriority(.defaultLow, for: .horizontal)
     updateAppearance(animated: false)
+  }
+
+  func updateKey(_ newKey: KeyboardLayoutKey) {
+    self.key = newKey
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    if bounds.width > 0 && bounds.height > 0 {
+      layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: layer.cornerRadius).cgPath
+    }
   }
 
   @available(*, unavailable)

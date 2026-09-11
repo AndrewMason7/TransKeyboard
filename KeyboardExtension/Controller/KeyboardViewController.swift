@@ -83,6 +83,12 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
     restoreTrackedRequest()
     keyboardSurface.delegate = self
     buildInterface()
+
+    registerForTraitChanges(
+      [UITraitHorizontalSizeClass.self, UITraitVerticalSizeClass.self]
+    ) { (controller: KeyboardViewController, _) in
+      controller.updateKeyboardHeight()
+    }
   }
 
   override func viewWillAppear(_ animated: Bool) {

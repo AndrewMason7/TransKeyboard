@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PROJECT_ROOT="${0:A:h:h}"
-DEVELOPER_ROOT="/Applications/Xcode.app/Contents/Developer"
+DEVELOPER_ROOT="${DEVELOPER_DIR:-$(xcode-select -p)}"
 PROJECT_PATH="$PROJECT_ROOT/GeminiVoiceKeyboard.xcodeproj"
 DERIVED_DATA="$PROJECT_ROOT/build/DeviceDerivedData"
 DEVICE_SELECTOR="${1:-${GEMINI_VOICE_DEVICE_UDID:-}}"

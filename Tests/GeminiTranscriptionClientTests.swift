@@ -4,8 +4,8 @@ import XCTest
 @testable import GeminiVoice
 
 private final class MockURLProtocol: URLProtocol {
-  static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
-  static var startLoadingCount = 0
+  nonisolated(unsafe) static var handler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
+  nonisolated(unsafe) static var startLoadingCount = 0
 
   override class func canInit(with request: URLRequest) -> Bool { true }
   override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }

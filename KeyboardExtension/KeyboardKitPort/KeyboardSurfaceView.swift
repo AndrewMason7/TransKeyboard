@@ -4,6 +4,7 @@ import UIKit
 // sample needs, while keeping the implementation local and editable.
 // Copyright (c) 2016-2025 Daniel Saidi. MIT license; see THIRD_PARTY_NOTICES.md.
 
+@MainActor
 protocol KeyboardSurfaceViewDelegate: AnyObject {
   func keyboardSurface(_ surface: KeyboardSurfaceView, insertText text: String)
   func keyboardSurfaceDeleteBackward(_ surface: KeyboardSurfaceView)
@@ -27,8 +28,11 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
   private let rootStack = UIStackView()
   private let inputCallout = KeyboardInputCalloutView()
   private let alternateCallout = KeyboardAlternateCalloutView()
+  private let selectionFeedbackGenerator = UISelectionFeedbackGenerator()
+  private var rowButtons: [[KeyboardKeyButton]] = []
   private var deleteDelayTimer: Timer?
   private var deleteRepeatTimer: Timer?
+  private var isDeleting = false
   private var longPressOptions: [ObjectIdentifier: [String]] = [:]
   private var activeLongPressOptions: [String] = []
   private var spaceDidMove = false
@@ -40,7 +44,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     rootStack.axis = .vertical
     rootStack.alignment = .fill
     rootStack.distribution = .fillEqually
-    rootStack.spacing = 6
+    rootStack.spacing = 11
     rootStack.translatesAutoresizingMaskIntoConstraints = false
     addSubview(rootStack)
     let fillWidth = rootStack.widthAnchor.constraint(equalTo: widthAnchor, constant: -8)
@@ -57,9 +61,20 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
       rootStack.centerXAnchor.constraint(equalTo: centerXAnchor),
       rootStack.widthAnchor.constraint(lessThanOrEqualToConstant: 760),
       fillWidth,
-      rootStack.topAnchor.constraint(equalTo: topAnchor),
-      rootStack.bottomAnchor.constraint(equalTo: bottomAnchor),
+      rootStack.topAnchor.constraint(equalTo: topAnchor, constant: 4),
+      rootStack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
     ])
+
+    registerForTraitChanges(
+      [UITraitHorizontalSizeClass.self, UITraitVerticalSizeClass.self]
+    ) { (view: KeyboardSurfaceView, previousTraitCollection: UITraitCollection) in
+      if previousTraitCollection.horizontalSizeClass != view.traitCollection.horizontalSizeClass
+        || previousTraitCollection.verticalSizeClass != view.traitCollection.verticalSizeClass
+      {
+        view.rebuild()
+      }
+    }
+
     rebuild()
   }
 
@@ -91,7 +106,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     let previous = interactionState.capitalization
     interactionState.applyAutomaticCapitalization(capitalization)
     if interactionState.capitalization != previous {
-      rebuild()
+      updateOrRebuild()
     }
   }
 
@@ -109,7 +124,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     case .shift:
       delegate?.keyboardSurfacePlayInputClick(self)
       interactionState.tapShift(at: ProcessInfo.processInfo.systemUptime)
-      rebuild()
+      updateOrRebuild()
     case .page:
       delegate?.keyboardSurfacePlayInputClick(self)
       interactionState.tapPage()
@@ -125,57 +140,217 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     }
   }
 
+  private func updateOrRebuild() {
+    let rows = interactionState.layout(
+      inputKind: inputKind,
+      needsInputModeSwitchKey: needsInputModeSwitchKey
+    )
+    if canUpdateInPlace(with: rows) {
+      updateKeyPresentations(with: rows)
+    } else {
+      rebuild()
+    }
+  }
+
+  private func canUpdateInPlace(with rows: [KeyboardLayoutRow]) -> Bool {
+    guard !rowButtons.isEmpty, rowButtons.count == rows.count else { return false }
+    for (buttons, row) in zip(rowButtons, rows) {
+      if buttons.count != row.keys.count { return false }
+    }
+    return true
+  }
+
+  private func updateKeyPresentations(with rows: [KeyboardLayoutRow]) {
+    resetTransientState()
+    for (buttons, row) in zip(rowButtons, rows) {
+      for (button, key) in zip(buttons, row.keys) {
+        button.updateKey(key)
+        let presentation = presentation(for: key.action)
+        button.configure(
+          title: presentation.title,
+          systemImage: presentation.systemImage,
+          accessibilityLabel: presentation.accessibilityLabel
+        )
+        button.accessibilityIdentifier = presentation.accessibilityIdentifier
+        if case .text(let text) = key.action {
+          let options = interactionState.alternateCharacters(for: text)
+          if options.count > 1 {
+            longPressOptions[ObjectIdentifier(button)] = options
+          } else {
+            longPressOptions.removeValue(forKey: ObjectIdentifier(button))
+          }
+        }
+      }
+    }
+  }
+
   private func rebuild() {
     resetTransientState()
-    rootStack.spacing = traitCollection.horizontalSizeClass == .regular ? 8 : 6
     longPressOptions.removeAll()
+    rowButtons.removeAll()
     rootStack.arrangedSubviews.forEach {
       rootStack.removeArrangedSubview($0)
       $0.removeFromSuperview()
     }
 
+    let isRegular = traitCollection.horizontalSizeClass == .regular
+    let isCompactVertical = traitCollection.verticalSizeClass == .compact
+    let horizontalSpacing: CGFloat = isRegular ? 8 : 6
+    let verticalSpacing: CGFloat = isCompactVertical ? 6 : (isRegular ? 12 : 11)
+
+    rootStack.spacing = verticalSpacing
+
     let rows = interactionState.layout(
       inputKind: inputKind,
       needsInputModeSwitchKey: needsInputModeSwitchKey
     )
-    rows.map(makeRow).forEach(rootStack.addArrangedSubview)
-  }
 
-  private func makeRow(_ row: KeyboardLayoutRow) -> UIView {
-    let container = UIView()
-    let stack = UIStackView()
-    stack.axis = .horizontal
-    stack.alignment = .fill
-    stack.distribution = .fill
-    stack.spacing = traitCollection.horizontalSizeClass == .regular ? 8 : 6
-    stack.translatesAutoresizingMaskIntoConstraints = false
-    container.addSubview(stack)
+    guard !rows.isEmpty else { return }
 
-    let unit: CGFloat = traitCollection.horizontalSizeClass == .regular ? 48 : 36
+    var rowContainers: [UIView] = []
+    var rowStacks: [UIStackView] = []
+    var rowButtons: [[KeyboardKeyButton]] = []
+
+    for row in rows {
+      let container = UIView()
+      let stack = UIStackView()
+      stack.axis = .horizontal
+      stack.alignment = .fill
+      stack.distribution = .fill
+      stack.spacing = horizontalSpacing
+      stack.translatesAutoresizingMaskIntoConstraints = false
+      container.addSubview(stack)
+
+      NSLayoutConstraint.activate([
+        stack.topAnchor.constraint(equalTo: container.topAnchor),
+        stack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+      ])
+
+      let buttons = row.keys.map(makeButton)
+      buttons.forEach(stack.addArrangedSubview)
+
+      container.translatesAutoresizingMaskIntoConstraints = false
+      rootStack.addArrangedSubview(container)
+
+      rowContainers.append(container)
+      rowStacks.append(stack)
+      rowButtons.append(buttons)
+    }
+
+    self.rowButtons = rowButtons
+
+    guard let firstRowButtons = rowButtons.first, let baseKey = firstRowButtons.first else {
+      return
+    }
+
+    // Row 0: Full width, all keys equal to baseKey
+    let firstStack = rowStacks[0]
+    let firstContainer = rowContainers[0]
     NSLayoutConstraint.activate([
-      stack.leadingAnchor.constraint(
-        equalTo: container.leadingAnchor,
-        constant: CGFloat(row.leadingInset) * unit
-      ),
-      stack.trailingAnchor.constraint(
-        equalTo: container.trailingAnchor,
-        constant: -CGFloat(row.trailingInset) * unit
-      ),
-      stack.topAnchor.constraint(equalTo: container.topAnchor),
-      stack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+      firstStack.leadingAnchor.constraint(equalTo: firstContainer.leadingAnchor),
+      firstStack.trailingAnchor.constraint(equalTo: firstContainer.trailingAnchor),
     ])
+    for button in firstRowButtons.dropFirst() {
+      button.widthAnchor.constraint(equalTo: baseKey.widthAnchor).isActive = true
+    }
 
-    let buttons = row.keys.map(makeButton)
-    buttons.forEach(stack.addArrangedSubview)
-    if let first = buttons.first, let firstKey = row.keys.first {
-      for (button, key) in zip(buttons.dropFirst(), row.keys.dropFirst()) {
-        button.widthAnchor.constraint(
-          equalTo: first.widthAnchor,
-          multiplier: CGFloat(key.width / firstKey.width)
-        ).isActive = true
+    if rows.count >= 3 {
+      // Row 1:
+      let secondRowButtons = rowButtons[1]
+      let secondStack = rowStacks[1]
+      let secondContainer = rowContainers[1]
+      let secondRowLayout = rows[1]
+
+      for button in secondRowButtons {
+        button.widthAnchor.constraint(equalTo: baseKey.widthAnchor).isActive = true
+      }
+
+      if secondRowLayout.leadingInset > 0 {
+        NSLayoutConstraint.activate([
+          secondStack.centerXAnchor.constraint(equalTo: secondContainer.centerXAnchor),
+          secondStack.leadingAnchor.constraint(greaterThanOrEqualTo: secondContainer.leadingAnchor),
+          secondStack.trailingAnchor.constraint(lessThanOrEqualTo: secondContainer.trailingAnchor),
+        ])
+      } else {
+        NSLayoutConstraint.activate([
+          secondStack.leadingAnchor.constraint(equalTo: secondContainer.leadingAnchor),
+          secondStack.trailingAnchor.constraint(equalTo: secondContainer.trailingAnchor),
+        ])
+      }
+
+      // Row 2: Shift, letter keys, Backspace
+      let thirdRowButtons = rowButtons[2]
+      let thirdStack = rowStacks[2]
+      let thirdContainer = rowContainers[2]
+
+      NSLayoutConstraint.activate([
+        thirdStack.leadingAnchor.constraint(equalTo: thirdContainer.leadingAnchor),
+        thirdStack.trailingAnchor.constraint(equalTo: thirdContainer.trailingAnchor),
+      ])
+
+      let shiftButton = thirdRowButtons.first
+      let backspaceButton = thirdRowButtons.last
+
+      if let shift = shiftButton, let backspace = backspaceButton, thirdRowButtons.count >= 3 {
+        let middleKeys = thirdRowButtons.dropFirst().dropLast()
+        for button in middleKeys {
+          button.widthAnchor.constraint(equalTo: baseKey.widthAnchor).isActive = true
+        }
+        shift.widthAnchor.constraint(equalTo: backspace.widthAnchor).isActive = true
+      } else {
+        for button in thirdRowButtons {
+          button.widthAnchor.constraint(equalTo: baseKey.widthAnchor).isActive = true
+        }
+      }
+
+      // Row 3 (Bottom row):
+      if rows.count >= 4 {
+        let bottomButtons = rowButtons[3]
+        let bottomStack = rowStacks[3]
+        let bottomContainer = rowContainers[3]
+        let bottomRowLayout = rows[3]
+
+        NSLayoutConstraint.activate([
+          bottomStack.leadingAnchor.constraint(equalTo: bottomContainer.leadingAnchor),
+          bottomStack.trailingAnchor.constraint(equalTo: bottomContainer.trailingAnchor),
+        ])
+
+        for (button, key) in zip(bottomButtons, bottomRowLayout.keys) {
+          switch key.action {
+          case .page:
+            if needsInputModeSwitchKey {
+              button.widthAnchor.constraint(equalTo: baseKey.widthAnchor, multiplier: 1.25).isActive = true
+            } else if let shift = shiftButton {
+              button.widthAnchor.constraint(equalTo: shift.widthAnchor).isActive = true
+            } else {
+              button.widthAnchor.constraint(equalTo: baseKey.widthAnchor, multiplier: 1.45).isActive = true
+            }
+          case .nextKeyboard:
+            button.widthAnchor.constraint(equalTo: baseKey.widthAnchor, multiplier: 1.15).isActive = true
+          case .returnKey:
+            if let backspace = backspaceButton {
+              button.widthAnchor.constraint(equalTo: backspace.widthAnchor).isActive = true
+            } else {
+              button.widthAnchor.constraint(equalTo: baseKey.widthAnchor, multiplier: 1.5).isActive = true
+            }
+          case .space:
+            button.setContentHuggingPriority(UILayoutPriority(100), for: .horizontal)
+            button.setContentCompressionResistancePriority(UILayoutPriority(100), for: .horizontal)
+          case .text(let str):
+            if str == ".com" {
+              button.setContentHuggingPriority(UILayoutPriority(100), for: .horizontal)
+              button.setContentCompressionResistancePriority(UILayoutPriority(100), for: .horizontal)
+            } else if str.count == 1 {
+              button.widthAnchor.constraint(equalTo: baseKey.widthAnchor).isActive = true
+            } else {
+              button.widthAnchor.constraint(equalTo: baseKey.widthAnchor, multiplier: 1.5).isActive = true
+            }
+          default:
+            button.widthAnchor.constraint(equalTo: baseKey.widthAnchor).isActive = true
+          }
+        }
       }
     }
-    return container
   }
 
   private func makeButton(for key: KeyboardLayoutKey) -> KeyboardKeyButton {
@@ -270,7 +445,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
         in: self,
         anchoredToTrailingEdge: anchorsToTrailingEdge
       )
-      UISelectionFeedbackGenerator().selectionChanged()
+      selectionFeedbackGenerator.selectionChanged()
     case .changed:
       alternateCallout.updateSelection(at: point, options: activeLongPressOptions)
     case .ended:
@@ -290,10 +465,12 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
   @objc private func deleteTouchDown() {
     activate(.backspace)
     stopDeleteRepeat()
+    isDeleting = true
     let delay = Timer(timeInterval: 0.42, repeats: false) { [weak self] _ in
-      guard let self else { return }
+      guard let self, self.isDeleting else { return }
       let repeating = Timer(timeInterval: 0.072, repeats: true) { [weak self] _ in
-        self?.deleteOnce()
+        guard let self, self.isDeleting else { return }
+        self.deleteOnce()
       }
       self.deleteRepeatTimer = repeating
       RunLoop.main.add(repeating, forMode: .common)
@@ -312,6 +489,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
   }
 
   private func stopDeleteRepeat() {
+    isDeleting = false
     deleteDelayTimer?.invalidate()
     deleteDelayTimer = nil
     deleteRepeatTimer?.invalidate()
@@ -321,6 +499,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
   @objc private func spaceTouchDown() {
     spaceDidMove = false
     lastSpaceStep = 0
+    selectionFeedbackGenerator.prepare()
   }
 
   @objc private func spaceTouchUpInside() {
@@ -337,6 +516,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
 
   @objc private func spacePanned(_ recognizer: UIPanGestureRecognizer) {
     let translation = recognizer.translation(in: recognizer.view)
+    guard translation.x.isFinite else { return }
     if abs(translation.x) > 8 {
       spaceDidMove = true
     }
@@ -344,7 +524,8 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     let delta = step - lastSpaceStep
     if delta != 0 {
       delegate?.keyboardSurface(self, adjustTextPositionBy: delta)
-      UISelectionFeedbackGenerator().selectionChanged()
+      selectionFeedbackGenerator.selectionChanged()
+      selectionFeedbackGenerator.prepare()
       lastSpaceStep = step
     }
     if recognizer.state == .ended || recognizer.state == .cancelled {
@@ -363,7 +544,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     let previous = interactionState.capitalization
     interactionState.consumeText()
     if previous != interactionState.capitalization {
-      rebuild()
+      updateOrRebuild()
     }
   }
 

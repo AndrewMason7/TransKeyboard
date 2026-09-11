@@ -185,11 +185,11 @@ private extension KeyboardInteractionState {
   ) -> [KeyboardLayoutRow] {
     [
       KeyboardLayoutRow(textKeys("qwertyuiop")),
-      KeyboardLayoutRow(textKeys("asdfghjkl"), leadingInset: 0.45, trailingInset: 0.45),
+      KeyboardLayoutRow(textKeys("asdfghjkl"), leadingInset: 0.5, trailingInset: 0.5),
       KeyboardLayoutRow(
-        [KeyboardLayoutKey(.shift, width: 1.35, style: .system)]
+        [KeyboardLayoutKey(.shift, width: 1.5, style: .system)]
           + textKeys("zxcvbnm")
-          + [KeyboardLayoutKey(.backspace, width: 1.35, style: .system)]
+          + [KeyboardLayoutKey(.backspace, width: 1.5, style: .system)]
       ),
       bottomRow(inputKind: inputKind, needsInputModeSwitchKey: needsInputModeSwitchKey),
     ]
@@ -203,13 +203,13 @@ private extension KeyboardInteractionState {
       KeyboardLayoutRow(literalKeys(Array("1234567890").map(String.init))),
       KeyboardLayoutRow(
         literalKeys(["-", "/", ":", ";", "(", ")", "$", "&", "@", "\""]),
-        leadingInset: 0.22,
-        trailingInset: 0.22
+        leadingInset: 0,
+        trailingInset: 0
       ),
       KeyboardLayoutRow(
-        [KeyboardLayoutKey(.shift, width: 1.35, style: .system)]
+        [KeyboardLayoutKey(.shift, width: 1.5, style: .system)]
           + literalKeys([".", ",", "?", "!", "'", "+", "="])
-          + [KeyboardLayoutKey(.backspace, width: 1.35, style: .system)]
+          + [KeyboardLayoutKey(.backspace, width: 1.5, style: .system)]
       ),
       bottomRow(inputKind: inputKind, needsInputModeSwitchKey: needsInputModeSwitchKey),
     ]
@@ -223,13 +223,13 @@ private extension KeyboardInteractionState {
       KeyboardLayoutRow(literalKeys(["[", "]", "{", "}", "#", "%", "^", "*", "+", "="])),
       KeyboardLayoutRow(
         literalKeys(["_", "\\", "|", "~", "<", ">", "€", "£", "¥"]),
-        leadingInset: 0.45,
-        trailingInset: 0.45
+        leadingInset: 0.5,
+        trailingInset: 0.5
       ),
       KeyboardLayoutRow(
-        [KeyboardLayoutKey(.shift, width: 1.35, style: .system)]
+        [KeyboardLayoutKey(.shift, width: 1.5, style: .system)]
           + literalKeys([".", ",", "?", "!", "'", "\"", "`"])
-          + [KeyboardLayoutKey(.backspace, width: 1.35, style: .system)]
+          + [KeyboardLayoutKey(.backspace, width: 1.5, style: .system)]
       ),
       bottomRow(inputKind: inputKind, needsInputModeSwitchKey: needsInputModeSwitchKey),
     ]
@@ -239,31 +239,31 @@ private extension KeyboardInteractionState {
     inputKind: KeyboardInputKind,
     needsInputModeSwitchKey: Bool
   ) -> KeyboardLayoutRow {
-    var keys = [KeyboardLayoutKey(.page, width: 1.45, style: .system)]
+    var keys = [KeyboardLayoutKey(.page, width: 1.5, style: .system)]
     if needsInputModeSwitchKey {
-      keys.append(KeyboardLayoutKey(.nextKeyboard, width: 1.1, style: .system))
+      keys.append(KeyboardLayoutKey(.nextKeyboard, width: 1.15, style: .system))
     }
 
     switch inputKind {
     case .standard:
       keys += [
         KeyboardLayoutKey(.space, width: 4.8),
-        KeyboardLayoutKey(.text("."), width: 1.05, style: .system),
+        KeyboardLayoutKey(.text("."), width: 1.0, style: .system),
       ]
     case .email:
       keys += [
-        KeyboardLayoutKey(.text("@"), width: 1.05, style: .system),
+        KeyboardLayoutKey(.text("@"), width: 1.0, style: .system),
         KeyboardLayoutKey(.space, width: 3.4),
-        KeyboardLayoutKey(.text("."), width: 1.05, style: .system),
+        KeyboardLayoutKey(.text("."), width: 1.0, style: .system),
       ]
     case .url:
       keys += [
-        KeyboardLayoutKey(.text("/"), width: 1.05, style: .system),
-        KeyboardLayoutKey(.text("."), width: 1.05, style: .system),
-        KeyboardLayoutKey(.text(".com"), width: 2.0),
+        KeyboardLayoutKey(.text("/"), width: 1.0, style: .system),
+        KeyboardLayoutKey(.text("."), width: 1.0, style: .system),
+        KeyboardLayoutKey(.text(".com"), width: 1.5),
       ]
     }
-    keys.append(KeyboardLayoutKey(.returnKey, width: 1.8, style: .accent))
+    keys.append(KeyboardLayoutKey(.returnKey, width: 1.5, style: .accent))
     return KeyboardLayoutRow(keys)
   }
 }

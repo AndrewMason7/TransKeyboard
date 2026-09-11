@@ -1,8 +1,33 @@
+import AVFoundation
 import XCTest
 
 @testable import GeminiVoice
 
 final class AudioCaptureEngineTests: XCTestCase {
+  func testRejectsStaleRouteFormatBeforeInstallingTap() throws {
+    let oldRoute = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1))
+    let newRoute = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1))
+    let stereoRoute = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+    XCTAssertFalse(AudioCaptureEngine.isUsableInputFormat(oldRoute, hardwareFormat: newRoute))
+    XCTAssertFalse(AudioCaptureEngine.isUsableInputFormat(newRoute, hardwareFormat: stereoRoute))
+    XCTAssertTrue(AudioCaptureEngine.isUsableInputFormat(newRoute, hardwareFormat: newRoute))
+  }
+
+  @MainActor
+  func testReplacedEngineIgnoresOldConfigurationNotifications() {
+    let capture = AudioCaptureEngine()
+    let oldEngine = capture.engine
+    capture.replaceStoppedEngine()
+    XCTAssertFalse(oldEngine === capture.engine)
+    capture.shouldBeRunning = true
+    NotificationCenter.default.post(name: .AVAudioEngineConfigurationChange, object: oldEngine)
+    XCTAssertNil(capture.recoveryWorkItem)
+    NotificationCenter.default.post(name: .AVAudioEngineConfigurationChange, object: capture.engine)
+    XCTAssertNotNil(capture.recoveryWorkItem)
+    capture.stop()
+    XCTAssertNil(capture.recoveryWorkItem)
+  }
+
   func testRecoverableRecordingScanRunsOnlyOncePerRelayInstance() {
     var gate = RecoverableRecordingScanGate()
 

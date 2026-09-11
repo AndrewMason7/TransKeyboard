@@ -59,9 +59,14 @@ extension AudioCaptureEngine {
     try? session.setPreferredIOBufferDuration(0.02)
     try session.setActive(true, options: [])
 
+    // An engine retained across a route change can expose the old output
+    // format even after session activation. Never reinstall a tap on that graph.
+    replaceStoppedEngine()
     let input = engine.inputNode
+    let hardwareFormat = input.inputFormat(forBus: 0)
     let format = input.outputFormat(forBus: 0)
-    guard format.sampleRate > 0, format.channelCount > 0 else {
+    guard Self.isUsableInputFormat(format, hardwareFormat: hardwareFormat) else {
+      NSLog("IOS_VALIDATION_FAILURE microphone route format unavailable or changing")
       throw AudioCaptureError.invalidInputFormat
     }
 
@@ -78,12 +83,11 @@ extension AudioCaptureEngine {
   }
 
   func tearDownEngine() {
+    // Stop delivery before removing the tap and releasing converter state.
+    engine.stop()
     if tapInstalled {
       engine.inputNode.removeTap(onBus: 0)
       tapInstalled = false
-    }
-    if engine.isRunning {
-      engine.stop()
     }
     try? AVAudioSession.sharedInstance().setActive(
       false,
@@ -136,20 +140,38 @@ extension AudioCaptureEngine {
     recoveryWorkItem?.cancel()
     cancelSegment()
     tearDownEngine()
+    replaceStoppedEngine()
+    scheduleRecovery(reason: "media services reset")
+  }
+
+  static func isUsableInputFormat(
+    _ format: AVAudioFormat,
+    hardwareFormat: AVAudioFormat
+  ) -> Bool {
+    hardwareFormat.sampleRate.isFinite && hardwareFormat.sampleRate > 0
+      && hardwareFormat.channelCount > 0
+      && format.sampleRate == hardwareFormat.sampleRate
+      && format.channelCount == hardwareFormat.channelCount
+  }
+
+  /// Call only after teardown or before a fresh session's first tap.
+  func replaceStoppedEngine() {
     if let engineConfigurationObserver {
       NotificationCenter.default.removeObserver(engineConfigurationObserver)
     }
     engine = AVAudioEngine()
+    observeEngineConfiguration()
+  }
 
-    let center = NotificationCenter.default
-    engineConfigurationObserver = center.addObserver(
+  func observeEngineConfiguration() {
+    engineConfigurationObserver = NotificationCenter.default.addObserver(
       forName: .AVAudioEngineConfigurationChange,
       object: engine,
       queue: .main
-    ) { [weak self] _ in
-      self?.scheduleRecovery(reason: "audio route changed")
+    ) { [weak self, weak observedEngine = engine] _ in
+      guard let self, let observedEngine, self.engine === observedEngine else { return }
+      self.scheduleRecovery(reason: "audio route changed")
     }
-    scheduleRecovery(reason: "media services reset")
   }
 
   func recover(reason: String) {

@@ -61,13 +61,7 @@ final class AudioCaptureEngine: @unchecked Sendable {
         self?.handleInterruption(notification)
       }
     )
-    engineConfigurationObserver = center.addObserver(
-      forName: .AVAudioEngineConfigurationChange,
-      object: engine,
-      queue: .main
-    ) { [weak self] _ in
-      self?.scheduleRecovery(reason: "audio route changed")
-    }
+    observeEngineConfiguration()
     observers.append(
       center.addObserver(
         forName: AVAudioSession.mediaServicesWereResetNotification,
@@ -122,6 +116,8 @@ final class AudioCaptureEngine: @unchecked Sendable {
       tearDownEngine()
     }
 
+    recoveryWorkItem?.cancel()
+    recoveryWorkItem = nil
     isConfiguring = true
     defer { isConfiguring = false }
 

@@ -91,6 +91,8 @@ final class RelayController: ObservableObject {
   var relayStartupGeneration = 0
   var transcriptionGeneration = 0
   var transcriptionTask: Task<Void, Never>?
+  var processingRequestID: String?
+  var processingRecordingID: UUID?
   var recoveryRetryTask: Task<Void, Never>?
   var relaySessionID: String?
   var liveRequestID: String?
@@ -218,6 +220,8 @@ final class RelayController: ObservableObject {
     transcriptionGeneration += 1
     transcriptionTask?.cancel()
     transcriptionTask = nil
+    processingRequestID = nil
+    processingRecordingID = nil
     recoveryRetryTask?.cancel()
     recoveryRetryTask = nil
     maximumDurationWorkItem?.cancel()

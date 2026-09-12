@@ -106,7 +106,7 @@ For the detailed state machine and safety invariants, see [`docs/ARCHITECTURE.md
 
 - **Warm relay is the intended path.** The containing app keeps its microphone session armed briefly in the background, so the keyboard can start immediately without leaving the text field.
 - **Cold relay needs a handoff.** Release asks the user to return manually. The personal Debug build contains an unsupported automatic-return experiment.
-- **Finish is not Cancel.** Finish drains accepted audio and waits for the authoritative final result. Cancel closes the stream, deletes the temporary recording, and inserts nothing.
+- **Finish is not Cancel.** Finish drains accepted audio and waits for the authoritative final result. Cancel remains available while recording or processing; it stops the work, deletes the temporary recording, and inserts nothing.
 - **Long recordings auto-finish at five minutes.** This bounds background and fallback resource use without interrupting normal dictation-length speech.
 - **Fallback is explicit.** A complete local WAV is used only when Live fails after Finish. Failed recordings remain available for a user-initiated retry.
 - **Insertion is guarded.** A result is inserted automatically only when its request and document anchor still match; otherwise the keyboard offers **Insert latest**.

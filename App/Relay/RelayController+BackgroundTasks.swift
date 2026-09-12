@@ -42,6 +42,8 @@ extension RelayController {
     transcriptionGeneration += 1
     transcriptionTask?.cancel()
     transcriptionTask = nil
+    processingRequestID = nil
+    processingRecordingID = nil
     recoveryRetryTask?.cancel()
     recoveryRetryTask = nil
     cancelLiveStream()

@@ -21,7 +21,7 @@ extension KeyboardViewController {
       clearTrackedRequest()
       hostLaunchFailureExpiresAt = nil
       mode = .idle
-    case .recording:
+    case .recording, .transcribing:
       store.issue(
         .cancel,
         requestID: activeRequestID,
@@ -29,7 +29,7 @@ extension KeyboardViewController {
       )
       mode = .cancelling
       persistTrackedRequest()
-    case .idle, .cancelling, .transcribing, .resultWaiting:
+    case .idle, .cancelling, .resultWaiting:
       return
     }
     UIImpactFeedbackGenerator(style: .rigid).impactOccurred()

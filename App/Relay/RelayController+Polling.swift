@@ -121,6 +121,8 @@ extension RelayController {
     case .cancel:
       if activeRequestID == envelope.requestID {
         cancelDictation()
+      } else if processingRequestID == envelope.requestID {
+        cancelTranscription(requestID: envelope.requestID)
       } else if pendingLaunchRequest?.requestID == envelope.requestID
         || store.pendingLaunchRequest()?.requestID == envelope.requestID
       {

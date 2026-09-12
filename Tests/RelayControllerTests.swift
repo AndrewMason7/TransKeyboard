@@ -46,6 +46,60 @@ final class RelayControllerTests: XCTestCase {
     XCTAssertEqual(RelayController.maximumDictationDuration, 5 * 60)
   }
 
+  func testCancelCommandStopsProcessingAndDeletesStagedRecording() throws {
+    let (controller, store) = try makeController()
+    let requestID = UUID().uuidString
+    let recordingURL = directoryURL
+      .appendingPathComponent("Recordings", isDirectory: true)
+      .appendingPathComponent("completed-transcribe-en-\(requestID).wav")
+    try FileManager.default.createDirectory(
+      at: recordingURL.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try Data([0, 1, 2, 3]).write(to: recordingURL)
+    let recording = try controller.recoveryStore.stage(
+      CapturedAudioSegment(
+        requestID: requestID,
+        url: recordingURL,
+        startedAt: Date().addingTimeInterval(-2),
+        endedAt: Date()
+      ),
+      action: .transcribe,
+      translationTargetCode: "en"
+    )
+
+    controller.isRelayRunning = true
+    controller.processingRequestID = requestID
+    controller.processingRecordingID = recording.id
+    controller.transcriptionTask = Task {
+      try? await Task.sleep(nanoseconds: 30_000_000_000)
+    }
+    controller.publish(
+      .transcribing,
+      message: "Finalizing live transcript…",
+      activeRequestID: requestID,
+      activeDictationAction: .transcribe
+    )
+
+    controller.handle(
+      RelayCommandEnvelope(
+        sequence: 1,
+        command: .cancel,
+        requestID: requestID,
+        dictationAction: .transcribe,
+        createdAt: Date()
+      )
+    )
+
+    XCTAssertNil(controller.transcriptionTask)
+    XCTAssertNil(controller.processingRequestID)
+    XCTAssertNil(controller.processingRecordingID)
+    XCTAssertTrue(controller.recoveryStore.recordings.isEmpty)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: recordingURL.path))
+    XCTAssertEqual(store.snapshot().status, .idle)
+    XCTAssertNil(store.snapshot().transcript)
+  }
+
   override func setUpWithError() throws {
     try super.setUpWithError()
     suiteName = "GeminiVoiceRelayControllerTests.\(UUID().uuidString)"

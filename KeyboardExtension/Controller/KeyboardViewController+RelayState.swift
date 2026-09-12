@@ -144,8 +144,8 @@ extension KeyboardViewController {
       translateButton.isEnabled = false
       cancelButton.isEnabled = false
     case .transcribing:
-      cancelButton.isEnabled = false
       if snapshot.status == .error {
+        cancelButton.isEnabled = false
         mode = .idle
         clearTrackedRequest()
         setStatus(snapshot.message, color: .systemOrange)
@@ -154,6 +154,7 @@ extension KeyboardViewController {
         microphoneButton.isEnabled = true
         translateButton.isEnabled = keyboardTranslationEnabled
       } else {
+        cancelButton.isEnabled = true
         setStatus(snapshot.message, color: .systemCyan)
         if activeDictationAction == .translate {
           configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemBlue)

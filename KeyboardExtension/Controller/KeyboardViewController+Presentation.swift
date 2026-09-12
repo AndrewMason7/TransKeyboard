@@ -89,10 +89,16 @@ extension KeyboardViewController {
         cancelButton.accessibilityLabel = "Cancel dictation"
       }
       cancelButton.accessibilityHint = "Stops and discards this recording without inserting text"
+    case .transcribing:
+      cancelButton.accessibilityLabel =
+        activeDictationAction == .translate
+        ? "Cancel translation"
+        : "Cancel transcription"
+      cancelButton.accessibilityHint = "Stops processing and discards the result without inserting text"
     case .cancelling:
       cancelButton.accessibilityLabel = "Cancelling"
       cancelButton.accessibilityHint = nil
-    case .idle, .transcribing, .resultWaiting:
+    case .idle, .resultWaiting:
       cancelButton.accessibilityLabel = "Cancel"
       cancelButton.accessibilityHint = nil
     }

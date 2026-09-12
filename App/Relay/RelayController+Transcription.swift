@@ -41,6 +41,47 @@ extension RelayController {
     markRelayActivityAndScheduleIdleShutdown()
   }
 
+  func cancelTranscription(requestID: String) {
+    guard status == .transcribing,
+      processingRequestID == requestID
+    else { return }
+
+    transcriptionGeneration += 1
+    transcriptionTask?.cancel()
+    transcriptionTask = nil
+    cancelLiveStream(matching: requestID)
+
+    let recordingID = processingRecordingID
+    processingRequestID = nil
+    processingRecordingID = nil
+    endTranscriptionBackgroundTaskIfNeeded()
+
+    if let recordingID {
+      do {
+        try recoveryStore.remove(id: recordingID)
+      } catch {
+        recoveryStore.markFailed(
+          id: recordingID,
+          message: "Processing stopped, but the saved recording could not be deleted: \(error.localizedDescription)"
+        )
+        refreshRecoverableRecordings()
+        publish(
+          .error,
+          message: "Processing stopped, but the saved recording could not be deleted"
+        )
+        markRelayActivityAndScheduleIdleShutdown()
+        return
+      }
+    }
+    refreshRecoverableRecordings()
+
+    if applyPendingAudioRecoveryFailureIfNeeded() {
+      return
+    }
+    publish(.idle, message: "Processing cancelled — ready")
+    markRelayActivityAndScheduleIdleShutdown()
+  }
+
   func finishDictationAndTranscribe(requestID: String) {
     markRelayActivityAndSuspendIdleShutdown()
     pendingFinishWorkItem?.cancel()
@@ -116,6 +157,8 @@ extension RelayController {
       return
     }
     refreshRecoverableRecordings()
+    processingRequestID = requestID
+    processingRecordingID = recoverableRecording.id
     transcriptionGeneration += 1
     let generation = transcriptionGeneration
     transcriptionTask?.cancel()
@@ -125,6 +168,8 @@ extension RelayController {
         if generation == transcriptionGeneration {
           cancelLiveStream(matching: requestID)
           transcriptionTask = nil
+          processingRequestID = nil
+          processingRecordingID = nil
           endTranscriptionBackgroundTaskIfNeeded()
         }
       }

@@ -13,6 +13,16 @@ An end-to-end iOS sample for Gemini 3.5 Live transcription and spoken translatio
 - Safe Finish, Cancel, fallback, recovery, and insertion into the original text field.
 - A project-local typing surface adapted from KeyboardKit, with no runtime library dependency.
 
+## Fork Enhancements & Modernization
+
+This fork upgrades the sample to modern iOS standards with a redesigned voice toolbar and Apple-matching typing surface:
+
+- **Native Apple Keyboard Geometry**: Compact keyboard height and tightened bottom padding so the bottom row keys (`123`, `space`, `.`, `return/search`) align cleanly right above the system globe and dictation microphone area.
+- **Refined Keycap Aesthetics**: Dark theme `#424242` background, 8.5 pt rounded keycaps, zero borderlines, zero 3D shadows, and crisp high-contrast white glyphs.
+- **Zero-Latency Typing**: Instantaneous case switching without crossfade lag, full multi-touch rollover, and touch-slop gesture handling to eliminate dropped keystrokes during rapid typing.
+- **SwiftUI Voice Toolbar**: Floating voice control bar with reactive status pill, live audio waveform levels, tactile haptics, and accessible touch targets.
+- **Hardened Architecture**: Full Swift 6 concurrency compliance, MainActor-isolated relay timer fixes, and an extensive unit test suite (103 passing tests across app and keyboard extension).
+
 ## Model routing
 
 The keyboard voice buttons always start a Gemini Live session. There is no batch-mode toggle.

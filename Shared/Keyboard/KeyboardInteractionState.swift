@@ -36,6 +36,7 @@ enum KeyboardKeyAction: Equatable {
   case nextKeyboard
   case space
   case returnKey
+  case emoji
 }
 
 struct KeyboardLayoutKey: Equatable {
@@ -67,7 +68,7 @@ struct KeyboardLayoutRow: Equatable {
 }
 
 struct KeyboardInteractionState: Equatable {
-  private static let doubleTapInterval: TimeInterval = 0.32
+  private static let doubleTapInterval: TimeInterval = 0.50
 
   private(set) var page: KeyboardPage = .letters
   private(set) var capitalization: KeyboardCapitalization = .lowercase
@@ -159,6 +160,15 @@ struct KeyboardInteractionState: Equatable {
     case "-": values = ["-", "–", "—", "•"]
     case "'": values = ["'", "’", "‘", "`"]
     case "\"": values = ["\"", "”", "“", "„"]
+    case "0": values = ["0", "°"]
+    case "1": values = ["1", "¹"]
+    case "$": values = ["$", "€", "£", "¥", "₩", "₽", "¢"]
+    case "%": values = ["%", "‰"]
+    case "*": values = ["*", "★"]
+    case "+": values = ["+", "±"]
+    case "=": values = ["=", "≠", "≈"]
+    case "?": values = ["?", "¿"]
+    case "!": values = ["!", "¡"]
     default: return []
     }
     return usesUppercaseLetters && text == text.uppercased()
@@ -239,7 +249,8 @@ private extension KeyboardInteractionState {
     inputKind: KeyboardInputKind,
     needsInputModeSwitchKey: Bool
   ) -> KeyboardLayoutRow {
-    var keys = [KeyboardLayoutKey(.page, width: 1.5, style: .system)]
+    let pageWidth: Double = (inputKind == .standard && !needsInputModeSwitchKey) ? 2.5 : 1.5
+    var keys = [KeyboardLayoutKey(.page, width: pageWidth, style: .system)]
     if needsInputModeSwitchKey {
       keys.append(KeyboardLayoutKey(.nextKeyboard, width: 1.15, style: .system))
     }
@@ -247,7 +258,7 @@ private extension KeyboardInteractionState {
     switch inputKind {
     case .standard:
       keys += [
-        KeyboardLayoutKey(.space, width: 4.8),
+        KeyboardLayoutKey(.space, width: 4.5),
         KeyboardLayoutKey(.text("."), width: 1.0, style: .system),
       ]
     case .email:

@@ -67,6 +67,12 @@ final class KeyboardInteractionStateTests: XCTestCase {
     XCTAssertFalse(
       actions(in: state.layout(inputKind: .url, needsInputModeSwitchKey: false))
         .contains(.space))
+    XCTAssertTrue(
+      actions(in: state.layout(inputKind: .standard, needsInputModeSwitchKey: true))
+        .contains(.text(".")))
+    XCTAssertFalse(
+      actions(in: state.layout(inputKind: .standard, needsInputModeSwitchKey: true))
+        .contains(.emoji))
   }
 
   func testNextKeyboardKeyTracksSystemRequirement() {

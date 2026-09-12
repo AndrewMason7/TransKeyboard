@@ -260,21 +260,22 @@ final class KeyboardSurfaceViewTests: XCTestCase {
   func testShiftUpdatePreservesButtonIdentityWithoutReallocatingViews() throws {
     let (surface, _) = makeSurface()
     let initialQ = try button("keyboard-key-q", in: surface)
+    let now = ProcessInfo.processInfo.systemUptime
 
-    surface.activate(.shift)
+    surface.activate(.shift, at: now)
 
     let uppercaseQ = try button("keyboard-key-Q", in: surface)
     // The exact same button instance must be updated in-place (no allocation/teardown)
     XCTAssertTrue(initialQ === uppercaseQ)
 
     // Consecutive tap within doubleTapInterval enters caps lock (letters remain uppercase)
-    surface.activate(.shift)
+    surface.activate(.shift, at: now + 0.1)
     XCTAssertTrue(surface.interactionState.isCapsLocked)
     let capsQ = try button("keyboard-key-Q", in: surface)
     XCTAssertTrue(initialQ === capsQ)
 
     // Tap exits caps lock back to lowercase
-    surface.activate(.shift)
+    surface.activate(.shift, at: now + 1.0)
     let lowercaseQ = try button("keyboard-key-q", in: surface)
     XCTAssertTrue(initialQ === lowercaseQ)
   }
@@ -411,6 +412,76 @@ final class KeyboardSurfaceViewTests: XCTestCase {
     let shiftButton = try button("keyboard-shift-key", in: surface)
     XCTAssertTrue(shiftButton.isSelected)
     XCTAssertNotNil(shiftButton.configuration?.image)
+  }
+
+  func testSecondaryAndTertiaryLayoutSpecificationsAndPunctuationExpansion() throws {
+    let (surface, _) = makeSurface()
+    surface.layoutIfNeeded()
+
+    let baseKey = try button("keyboard-key-q", in: surface)
+    let baseWidth = baseKey.bounds.width
+
+    // 1. Switch to secondary (numbers) layout
+    surface.activate(.page)
+    surface.layoutIfNeeded()
+    XCTAssertEqual(surface.interactionState.page, .numbers)
+
+    let num1 = try button("keyboard-key-1", in: surface)
+    let dot = try button("keyboard-key-.", in: surface)
+    let comma = try button("keyboard-key-,", in: surface)
+    let question = try button("keyboard-key-?", in: surface)
+    let exclamation = try button("keyboard-key-!", in: surface)
+    let quote = try button("keyboard-key-'", in: surface)
+
+    // Row 2 should NOT contain '+' or '='
+    // (Note: finding button from row 2 vs other rows)
+    let shiftKey = try button("keyboard-shift-key", in: surface)
+    XCTAssertEqual(shiftKey.configuration?.title, "#+=")
+    let deleteKey = try button("keyboard-delete-key", in: surface)
+
+    // The 5 punctuation keys in row 2 must have identical expanded widths
+    XCTAssertEqual(dot.bounds.width, comma.bounds.width, accuracy: 0.5)
+    XCTAssertEqual(comma.bounds.width, question.bounds.width, accuracy: 0.5)
+    XCTAssertEqual(question.bounds.width, exclamation.bounds.width, accuracy: 0.5)
+    XCTAssertEqual(exclamation.bounds.width, quote.bounds.width, accuracy: 0.5)
+
+    // Each expanded punctuation key must be wider than standard digit keys
+    XCTAssertGreaterThan(dot.bounds.width, num1.bounds.width)
+    XCTAssertGreaterThan(dot.bounds.width, baseWidth)
+
+    // Verify breathing margins between mode-switch/delete and the punctuation cluster
+    let shiftFrame = shiftKey.convert(shiftKey.bounds, to: surface)
+    let dotFrame = dot.convert(dot.bounds, to: surface)
+    let commaFrame = comma.convert(comma.bounds, to: surface)
+    let quoteFrame = quote.convert(quote.bounds, to: surface)
+    let deleteFrame = deleteKey.convert(deleteKey.bounds, to: surface)
+
+    let leadingBreathingGap = dotFrame.minX - shiftFrame.maxX
+    let trailingBreathingGap = deleteFrame.minX - quoteFrame.maxX
+    let internalSpacing = commaFrame.minX - dotFrame.maxX
+
+    XCTAssertGreaterThanOrEqual(leadingBreathingGap, 14.0)
+    XCTAssertEqual(leadingBreathingGap, trailingBreathingGap, accuracy: 0.5)
+    XCTAssertEqual(internalSpacing, 6.0, accuracy: 0.5)
+
+    // No ambiguous layout
+    XCTAssertFalse(allSubviews(of: surface).contains(where: \.hasAmbiguousLayout))
+
+    // 2. Switch to tertiary (symbols) layout
+    surface.activate(shiftKey.key.action)
+    surface.layoutIfNeeded()
+    XCTAssertEqual(surface.interactionState.page, .symbols)
+
+    // Row 1 must have bullet '•'
+    let bullet = try button("keyboard-key-•", in: surface)
+    XCTAssertNotNil(bullet)
+
+    let symDot = try button("keyboard-key-.", in: surface)
+    let symComma = try button("keyboard-key-,", in: surface)
+    XCTAssertEqual(symDot.bounds.width, symComma.bounds.width, accuracy: 0.5)
+    XCTAssertGreaterThan(symDot.bounds.width, baseWidth)
+
+    XCTAssertFalse(allSubviews(of: surface).contains(where: \.hasAmbiguousLayout))
   }
 
   private func makeSurface() -> (KeyboardSurfaceView, DelegateSpy) {

@@ -93,6 +93,40 @@ final class KeyboardInteractionStateTests: XCTestCase {
     XCTAssertEqual(Array(state.alternateCharacters(for: "A").prefix(3)), ["A", "À", "Á"])
   }
 
+  func testStandardNumericAndSymbolicLayoutRowSpecifications() {
+    var state = KeyboardInteractionState()
+    state.tapPage() // Numbers
+
+    let numberRows = state.layout(inputKind: .standard, needsInputModeSwitchKey: true)
+    let numberRow2Actions = numberRows[2].keys.map(\.action)
+    XCTAssertEqual(numberRow2Actions, [
+      .shift,
+      .text("."), .text(","), .text("?"), .text("!"), .text("'"),
+      .backspace,
+    ])
+
+    state.tapShift(at: 1) // Symbols
+    let symbolRows = state.layout(inputKind: .standard, needsInputModeSwitchKey: true)
+    let symbolRow1Actions = symbolRows[1].keys.map(\.action)
+    XCTAssertEqual(symbolRow1Actions, [
+      .text("_"), .text("\\"), .text("|"), .text("~"), .text("<"), .text(">"),
+      .text("€"), .text("£"), .text("¥"), .text("•"),
+    ])
+
+    let symbolRow2Actions = symbolRows[2].keys.map(\.action)
+    XCTAssertEqual(symbolRow2Actions, [
+      .shift,
+      .text("."), .text(","), .text("?"), .text("!"), .text("'"),
+      .backspace,
+    ])
+  }
+
+  func testPunctuationAlternateCharacters() {
+    let state = KeyboardInteractionState()
+    XCTAssertTrue(state.alternateCharacters(for: ".").contains("…"))
+    XCTAssertTrue(state.alternateCharacters(for: "&").contains("§"))
+  }
+
   private func actions(in rows: [KeyboardLayoutRow]) -> [KeyboardKeyAction] {
     rows.flatMap(\.keys).map(\.action)
   }

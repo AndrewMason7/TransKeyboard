@@ -98,8 +98,10 @@ For the detailed state machine and safety invariants, see [`docs/ARCHITECTURE.md
 4. Run the simulator test suite:
 
    ```sh
-   ./Scripts/test.sh
+   ./Scripts/test.sh      # Full suite (unit + UI tests)
+   ./Scripts/test.sh -u   # Fast unit tests only (~5s)
    ```
+
 
 5. Deploy to a paired iPhone:
 

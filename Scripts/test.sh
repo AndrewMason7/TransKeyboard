@@ -18,9 +18,45 @@ if [[ -z "$device_id" ]]; then
   exit 1
 fi
 
-xcodebuild \
-  -project GeminiVoiceKeyboard.xcodeproj \
-  -scheme GeminiVoice \
-  -destination "platform=iOS Simulator,id=$device_id" \
-  -derivedDataPath DerivedData \
-  test
+scheme="GeminiVoice"
+raw_output=0
+extra_args=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -u|--unit-only)
+      scheme="GeminiVoiceUnitTests"
+      shift
+      ;;
+    --raw)
+      raw_output=1
+      shift
+      ;;
+    *)
+      extra_args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+cmd=(
+  xcodebuild
+  -project GeminiVoiceKeyboard.xcodeproj
+  -scheme "$scheme"
+  -destination "platform=iOS Simulator,id=$device_id"
+  -derivedDataPath DerivedData
+  -collect-test-diagnostics never
+)
+
+if [[ ${#extra_args[@]} -gt 0 ]]; then
+  cmd+=("${extra_args[@]}")
+fi
+
+cmd+=(test)
+
+if [[ "$raw_output" -eq 0 ]] && command -v xcbeautify >/dev/null 2>&1; then
+  "${cmd[@]}" | xcbeautify
+else
+  "${cmd[@]}"
+fi
+

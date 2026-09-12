@@ -154,3 +154,18 @@ schemes:
         - GeminiVoiceTests
         - GeminiVoiceUITests
         - GeminiKeyboardPortTests
+
+  GeminiVoiceUnitTests:
+    build:
+      targets:
+        GeminiVoice: all
+        GeminiVoiceKeyboard: all
+        GeminiVoiceActivity: all
+        GeminiVoiceTests: [test]
+        GeminiKeyboardPortTests: [test]
+    test:
+      gatherCoverageData: true
+      targets:
+        - GeminiVoiceTests
+        - GeminiKeyboardPortTests
+

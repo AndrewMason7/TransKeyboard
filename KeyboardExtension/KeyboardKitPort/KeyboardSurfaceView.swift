@@ -203,13 +203,13 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     activeLongPressOptions = []
   }
 
-  func activate(_ action: KeyboardKeyAction) {
+  func activate(_ action: KeyboardKeyAction, at timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime) {
     switch action {
     case .text(let text):
       insertText(text)
     case .shift:
       delegate?.keyboardSurfacePlayInputClick(self)
-      interactionState.tapShift(at: ProcessInfo.processInfo.systemUptime)
+      interactionState.tapShift(at: timestamp)
       updateOrRebuild()
     case .page:
       delegate?.keyboardSurfacePlayInputClick(self)
@@ -313,6 +313,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
 
     let horizontalSpacing: CGFloat = isRegular ? 8 : (isCompactVertical ? 5 : 6)
     let keyHeight: CGFloat = isRegular ? 56 : (isCompactVertical ? 38 : (isLargePhone ? 45 : 42))
+    let breathingMargin: CGFloat = isRegular ? 20 : (isLargePhone || isCompactVertical ? 16 : 14)
 
     updateStackMetrics()
 
@@ -441,32 +442,50 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
           middleStack.isMultipleTouchEnabled = true
           middleStack.axis = .horizontal
           middleStack.alignment = .fill
-          middleStack.distribution = .fill
+          middleStack.distribution = middleKeys.count == 5 ? .fillEqually : .fill
           middleStack.spacing = horizontalSpacing
           middleStack.translatesAutoresizingMaskIntoConstraints = false
           middleKeys.forEach(middleStack.addArrangedSubview)
           thirdContainer.addSubview(middleStack)
 
-          for button in middleKeys {
-            button.widthAnchor.constraint(equalTo: baseKey.widthAnchor).isActive = true
+          if middleKeys.count == 5 {
+            NSLayoutConstraint.activate([
+              middleStack.topAnchor.constraint(equalTo: thirdContainer.topAnchor),
+              middleStack.bottomAnchor.constraint(equalTo: thirdContainer.bottomAnchor),
+              middleStack.leadingAnchor.constraint(equalTo: shiftButton.trailingAnchor, constant: breathingMargin),
+              middleStack.trailingAnchor.constraint(equalTo: backspaceButton.leadingAnchor, constant: -breathingMargin),
+
+              shiftButton.leadingAnchor.constraint(equalTo: thirdContainer.leadingAnchor),
+              shiftButton.topAnchor.constraint(equalTo: thirdContainer.topAnchor),
+              shiftButton.bottomAnchor.constraint(equalTo: thirdContainer.bottomAnchor),
+
+              backspaceButton.trailingAnchor.constraint(equalTo: thirdContainer.trailingAnchor),
+              backspaceButton.topAnchor.constraint(equalTo: thirdContainer.topAnchor),
+              backspaceButton.bottomAnchor.constraint(equalTo: thirdContainer.bottomAnchor),
+              backspaceButton.widthAnchor.constraint(equalTo: shiftButton.widthAnchor),
+            ])
+          } else {
+            for button in middleKeys {
+              button.widthAnchor.constraint(equalTo: baseKey.widthAnchor).isActive = true
+            }
+
+            NSLayoutConstraint.activate([
+              middleStack.topAnchor.constraint(equalTo: thirdContainer.topAnchor),
+              middleStack.bottomAnchor.constraint(equalTo: thirdContainer.bottomAnchor),
+              middleStack.centerXAnchor.constraint(equalTo: thirdContainer.centerXAnchor),
+              middleStack.leadingAnchor.constraint(greaterThanOrEqualTo: shiftButton.trailingAnchor, constant: horizontalSpacing),
+
+              shiftButton.leadingAnchor.constraint(equalTo: thirdContainer.leadingAnchor),
+              shiftButton.topAnchor.constraint(equalTo: thirdContainer.topAnchor),
+              shiftButton.bottomAnchor.constraint(equalTo: thirdContainer.bottomAnchor),
+
+              backspaceButton.trailingAnchor.constraint(equalTo: thirdContainer.trailingAnchor),
+              backspaceButton.topAnchor.constraint(equalTo: thirdContainer.topAnchor),
+              backspaceButton.bottomAnchor.constraint(equalTo: thirdContainer.bottomAnchor),
+              backspaceButton.leadingAnchor.constraint(greaterThanOrEqualTo: middleStack.trailingAnchor, constant: horizontalSpacing),
+              backspaceButton.widthAnchor.constraint(equalTo: shiftButton.widthAnchor),
+            ])
           }
-
-          NSLayoutConstraint.activate([
-            middleStack.topAnchor.constraint(equalTo: thirdContainer.topAnchor),
-            middleStack.bottomAnchor.constraint(equalTo: thirdContainer.bottomAnchor),
-            middleStack.centerXAnchor.constraint(equalTo: thirdContainer.centerXAnchor),
-            middleStack.leadingAnchor.constraint(greaterThanOrEqualTo: shiftButton.trailingAnchor, constant: horizontalSpacing),
-
-            shiftButton.leadingAnchor.constraint(equalTo: thirdContainer.leadingAnchor),
-            shiftButton.topAnchor.constraint(equalTo: thirdContainer.topAnchor),
-            shiftButton.bottomAnchor.constraint(equalTo: thirdContainer.bottomAnchor),
-
-            backspaceButton.trailingAnchor.constraint(equalTo: thirdContainer.trailingAnchor),
-            backspaceButton.topAnchor.constraint(equalTo: thirdContainer.topAnchor),
-            backspaceButton.bottomAnchor.constraint(equalTo: thirdContainer.bottomAnchor),
-            backspaceButton.leadingAnchor.constraint(greaterThanOrEqualTo: middleStack.trailingAnchor, constant: horizontalSpacing),
-            backspaceButton.widthAnchor.constraint(equalTo: shiftButton.widthAnchor),
-          ])
 
           let shiftWidth = shiftButton.widthAnchor.constraint(equalTo: baseKey.widthAnchor, multiplier: 1.36)
           shiftWidth.priority = UILayoutPriority(950)

@@ -156,7 +156,8 @@ struct KeyboardInteractionState: Equatable {
     case "u": values = ["u", "ù", "ú", "û", "ü", "ū"]
     case "y": values = ["y", "ý", "ÿ"]
     case "z": values = ["z", "ž", "ź", "ż"]
-    case ".": values = [".", ",", "?", "!"]
+    case ".": values = [".", "…", ",", "?", "!"]
+    case "&": values = ["&", "§"]
     case "-": values = ["-", "–", "—", "•"]
     case "'": values = ["'", "’", "‘", "`"]
     case "\"": values = ["\"", "”", "“", "„"]
@@ -217,9 +218,9 @@ private extension KeyboardInteractionState {
         trailingInset: 0
       ),
       KeyboardLayoutRow(
-        [KeyboardLayoutKey(.shift, width: 1.5, style: .system)]
-          + literalKeys([".", ",", "?", "!", "'", "+", "="])
-          + [KeyboardLayoutKey(.backspace, width: 1.5, style: .system)]
+        [KeyboardLayoutKey(.shift, width: 1.36, style: .system)]
+          + literalKeys([".", ",", "?", "!", "'"])
+          + [KeyboardLayoutKey(.backspace, width: 1.36, style: .system)]
       ),
       bottomRow(inputKind: inputKind, needsInputModeSwitchKey: needsInputModeSwitchKey),
     ]
@@ -232,14 +233,14 @@ private extension KeyboardInteractionState {
     [
       KeyboardLayoutRow(literalKeys(["[", "]", "{", "}", "#", "%", "^", "*", "+", "="])),
       KeyboardLayoutRow(
-        literalKeys(["_", "\\", "|", "~", "<", ">", "€", "£", "¥"]),
-        leadingInset: 0.5,
-        trailingInset: 0.5
+        literalKeys(["_", "\\", "|", "~", "<", ">", "€", "£", "¥", "•"]),
+        leadingInset: 0,
+        trailingInset: 0
       ),
       KeyboardLayoutRow(
-        [KeyboardLayoutKey(.shift, width: 1.5, style: .system)]
-          + literalKeys([".", ",", "?", "!", "'", "\"", "`"])
-          + [KeyboardLayoutKey(.backspace, width: 1.5, style: .system)]
+        [KeyboardLayoutKey(.shift, width: 1.36, style: .system)]
+          + literalKeys([".", ",", "?", "!", "'"])
+          + [KeyboardLayoutKey(.backspace, width: 1.36, style: .system)]
       ),
       bottomRow(inputKind: inputKind, needsInputModeSwitchKey: needsInputModeSwitchKey),
     ]

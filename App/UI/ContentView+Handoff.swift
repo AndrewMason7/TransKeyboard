@@ -15,7 +15,7 @@ extension ContentView {
         Spacer()
 
         ZStack {
-          RoundedRectangle(cornerRadius: 24, style: .continuous)
+          RoundedRectangle(cornerRadius: 24)
             .fill(
               LinearGradient(
                 colors: [.cyan, .blue, .purple],
@@ -49,9 +49,7 @@ extension ContentView {
             .padding(.horizontal, 32)
         }
 
-        Button {
-          relay.cancelKeyboardHandoff()
-        } label: {
+        Button(action: relay.cancelKeyboardHandoff) {
           Label(
             relay.status == .recording ? "Cancel recording" : "Cancel handoff",
             systemImage: "xmark"
@@ -60,7 +58,7 @@ extension ContentView {
           .frame(maxWidth: .infinity)
           .padding(.vertical, 15)
           .background(Color.white.opacity(0.12))
-          .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+          .clipShape(.rect(cornerRadius: 15))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 28)

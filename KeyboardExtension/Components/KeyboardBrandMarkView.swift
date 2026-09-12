@@ -15,6 +15,7 @@ final class KeyboardBrandMarkView: UIView {
 
     isUserInteractionEnabled = true
     let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+    tap.cancelsTouchesInView = false
     addGestureRecognizer(tap)
 
     gradientLayer.colors = [
@@ -54,6 +55,12 @@ final class KeyboardBrandMarkView: UIView {
     tapHandler?()
   }
 
+  override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+    let dx = max(0, (44 - bounds.width) / 2)
+    let dy = max(0, (44 - bounds.height) / 2)
+    return bounds.insetBy(dx: -dx, dy: -dy).contains(point)
+  }
+
   private var isPressed = false
 
   override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -82,9 +89,15 @@ final class KeyboardBrandMarkView: UIView {
   private func setPressed(_ pressed: Bool) {
     guard isPressed != pressed else { return }
     isPressed = pressed
-    UIView.animate(withDuration: pressed ? 0.05 : 0.15) {
-      self.alpha = pressed ? 0.6 : 1
-      self.transform = pressed ? CGAffineTransform(scaleX: 0.94, y: 0.94) : .identity
+    UIView.animate(
+      springDuration: pressed ? 0.08 : 0.20,
+      bounce: pressed ? 0.0 : 0.28,
+      initialSpringVelocity: 0,
+      delay: 0,
+      options: [.allowUserInteraction, .beginFromCurrentState]
+    ) {
+      self.alpha = pressed ? 0.82 : 1.0
+      self.transform = pressed ? CGAffineTransform(scaleX: 0.92, y: 0.92) : .identity
     }
   }
 
@@ -93,6 +106,8 @@ final class KeyboardBrandMarkView: UIView {
     gradientLayer.frame = bounds
     let cornerRadius = min(bounds.width, bounds.height) * 0.32
     gradientLayer.cornerRadius = cornerRadius
+    gradientLayer.cornerCurve = .continuous
+    layer.cornerCurve = .continuous
     if bounds.width > 0 && bounds.height > 0 {
       layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: cornerRadius).cgPath
     }

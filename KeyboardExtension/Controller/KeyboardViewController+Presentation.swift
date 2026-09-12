@@ -1,37 +1,39 @@
-import CryptoKit
-import Darwin
+import SwiftUI
 import UIKit
 
 extension KeyboardViewController {
   func configureMicrophone(title: String, image: String, color: UIColor) {
-    var configuration = microphoneButton.configuration
-    configuration?.title = nil
-    configuration?.image = UIImage(systemName: image)
-    configuration?.baseBackgroundColor = color
-    microphoneButton.configuration = configuration
+    let accessibilityLabel: String
+    let accessibilityHint: String?
     switch title {
     case "Finish":
-      microphoneButton.accessibilityLabel = "Finish dictation and insert text"
-      microphoneButton.accessibilityHint = "Ends this recording and sends it for transcription"
+      accessibilityLabel = "Finish dictation and insert text"
+      accessibilityHint = "Ends this recording and sends it for transcription"
     case "Transcribing":
-      microphoneButton.accessibilityLabel = "Transcribing with Gemini"
-      microphoneButton.accessibilityHint = nil
+      accessibilityLabel = "Transcribing with Gemini"
+      accessibilityHint = nil
     case "Try again":
-      microphoneButton.accessibilityLabel = "Start Gemini dictation again"
-      microphoneButton.accessibilityHint = nil
+      accessibilityLabel = "Start Gemini dictation again"
+      accessibilityHint = nil
     case "Open & dictate":
-      microphoneButton.accessibilityLabel = "Open Gemini Voice and start dictation"
-      microphoneButton.accessibilityHint = nil
+      accessibilityLabel = "Open Gemini Voice and start dictation"
+      accessibilityHint = nil
     case "Opening…":
-      microphoneButton.accessibilityLabel = "Opening Gemini Voice"
-      microphoneButton.accessibilityHint = nil
+      accessibilityLabel = "Opening Gemini Voice"
+      accessibilityHint = nil
     case "Starting…":
-      microphoneButton.accessibilityLabel = "Starting Gemini dictation"
-      microphoneButton.accessibilityHint = nil
+      accessibilityLabel = "Starting Gemini dictation"
+      accessibilityHint = nil
     default:
-      microphoneButton.accessibilityLabel = "Start Gemini dictation"
-      microphoneButton.accessibilityHint = nil
+      accessibilityLabel = "Start Gemini dictation"
+      accessibilityHint = nil
     }
+    toolbarState.configureMicrophone(
+      image: image,
+      color: Color(uiColor: color),
+      accessibilityLabel: accessibilityLabel,
+      accessibilityHint: accessibilityHint
+    )
   }
 
   var keyboardTranslationEnabled: Bool {
@@ -51,57 +53,63 @@ extension KeyboardViewController {
     color: UIColor = .systemIndigo
   ) {
     let target = keyboardTranslationTarget
-    var configuration = translateButton.configuration
-    configuration?.title = nil
-    configuration?.image = UIImage(systemName: image)
-    configuration?.baseBackgroundColor = color
-    translateButton.configuration = configuration
+    let accessibilityLabel: String
+    let accessibilityHint: String?
     switch title {
     case "Finish":
-      translateButton.accessibilityLabel = "Finish translation and insert text"
-      translateButton.accessibilityHint =
+      accessibilityLabel = "Finish translation and insert text"
+      accessibilityHint =
         "Ends this recording and sends it for translation to \(target.name)"
     case "…":
-      translateButton.accessibilityLabel = "Translating with Gemini"
-      translateButton.accessibilityHint = nil
+      accessibilityLabel = "Translating with Gemini"
+      accessibilityHint = nil
     default:
-      translateButton.accessibilityLabel = "Start dictation and translate to \(target.name)"
-      translateButton.accessibilityHint = nil
+      accessibilityLabel = "Start dictation and translate to \(target.name)"
+      accessibilityHint = nil
     }
-    translateButton.accessibilityValue = target.name
+    toolbarState.configureTranslation(
+      image: image,
+      color: Color(uiColor: color),
+      targetLanguage: target,
+      accessibilityLabel: accessibilityLabel,
+      accessibilityHint: accessibilityHint
+    )
   }
 
   func updateActionVisibility() {
-    microphoneButton.isHidden = false
-    translateButton.isHidden = false
-    cancelButton.isHidden = false
+    toolbarState.isCancelHidden = (mode == .idle)
+    toolbarState.isTranslateHidden = false
   }
 
   func updateCancelAccessibility() {
+    let label: String
+    let hint: String?
     switch mode {
     case .openingHost:
-      cancelButton.accessibilityLabel = "Cancel opening Gemini Voice"
-      cancelButton.accessibilityHint = "Cancels this dictation request before recording starts"
+      label = "Cancel opening Gemini Voice"
+      hint = "Cancels this dictation request before recording starts"
     case .recording:
       if activeDictationAction == .translate {
-        cancelButton.accessibilityLabel = "Cancel translation"
+        label = "Cancel translation"
       } else {
-        cancelButton.accessibilityLabel = "Cancel dictation"
+        label = "Cancel dictation"
       }
-      cancelButton.accessibilityHint = "Stops and discards this recording without inserting text"
-    case .transcribing:
-      cancelButton.accessibilityLabel =
-        activeDictationAction == .translate
-        ? "Cancel translation"
-        : "Cancel transcription"
-      cancelButton.accessibilityHint = "Stops processing and discards the result without inserting text"
-    case .cancelling:
-      cancelButton.accessibilityLabel = "Cancelling"
-      cancelButton.accessibilityHint = nil
-    case .idle, .resultWaiting:
-      cancelButton.accessibilityLabel = "Cancel"
-      cancelButton.accessibilityHint = nil
-    }
+      hint = "Stops and discards this recording without inserting text"
+      case .transcribing:
+        label =
+          activeDictationAction == .translate
+          ? "Cancel translation"
+          : "Cancel transcription"
+        hint = "Stops processing and discards the result without inserting text"
+      case .cancelling:
+        label = "Cancelling"
+        hint = nil
+      case .idle, .resultWaiting:
+        label = "Cancel"
+        hint = nil
+      }
+    toolbarState.cancelAccessibilityLabel = label
+    toolbarState.cancelAccessibilityHint = hint
   }
 
   func updateRecordingPresentation(with snapshot: RelaySnapshot) {
@@ -111,6 +119,7 @@ extension KeyboardViewController {
 
     guard isRecording else {
       waveformView.setLevel(0, active: false)
+      toolbarState.updateAudioLevel(0)
       return
     }
 
@@ -118,10 +127,9 @@ extension KeyboardViewController {
       snapshot.audioLevelUpdatedAt.map {
         Date().timeIntervalSince($0) >= 0 && Date().timeIntervalSince($0) < 0.8
       } ?? false
-    waveformView.setLevel(
-      levelIsFresh ? CGFloat(snapshot.audioLevel) : 0,
-      active: true
-    )
+    let currentLevel = levelIsFresh ? CGFloat(snapshot.audioLevel) : 0
+    waveformView.setLevel(currentLevel, active: true)
+    toolbarState.updateAudioLevel(currentLevel)
     recordingTitleLabel.text =
       activeDictationAction == .translate
       ? "Listening to translate"
@@ -134,31 +142,19 @@ extension KeyboardViewController {
         activeDictationAction == .translate
         ? "Translating…"
         : "Transcribing…"
-      processingLabel.text = label
-      processingLabel.textColor = Self.keyForegroundColor
-      processingStatusStack.accessibilityLabel = label
-      processingStatusStack.isHidden = false
-      processingIndicator.color = .systemCyan
-      processingIndicator.startAnimating()
+      toolbarState.updateProcessing(isProcessing: true, isError: false, message: label)
       return
     }
 
     if snapshot.status == .error {
-      processingIndicator.stopAnimating()
-      processingLabel.text = snapshot.message
-      processingLabel.textColor = .systemOrange
-      processingStatusStack.accessibilityLabel = snapshot.message
-      processingStatusStack.isHidden = false
+      toolbarState.updateProcessing(isProcessing: false, isError: true, message: snapshot.message)
       return
     }
 
-    processingIndicator.stopAnimating()
-    processingLabel.textColor = Self.keyForegroundColor
-    processingStatusStack.isHidden = true
-    processingStatusStack.accessibilityLabel = nil
+    toolbarState.updateProcessing(isProcessing: false, isError: false, message: nil)
   }
 
   func setStatus(_ text: String, color: UIColor) {
-    brandMarkView.setStatus(text, accentColor: color)
+    toolbarState.setBrandStatus(text: text, color: Color(uiColor: color))
   }
 }

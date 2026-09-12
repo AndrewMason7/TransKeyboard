@@ -62,19 +62,19 @@ extension ContentView {
                   recordingPendingDeletion = recording
                 } label: {
                   Image(systemName: "trash")
-                    .frame(width: 42, height: 42)
+                    .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.red)
                 .background(Color.red.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .clipShape(.rect(cornerRadius: 11))
                 .disabled(relay.retryingRecordingID == recording.id)
                 .accessibilityLabel("Delete saved recording")
               }
             }
             .padding(12)
             .background(Color.black.opacity(0.18))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(.rect(cornerRadius: 10))
           }
         }
       }

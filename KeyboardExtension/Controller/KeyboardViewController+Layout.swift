@@ -1,10 +1,11 @@
-import CryptoKit
-import Darwin
+import SwiftUI
 import UIKit
 
 extension KeyboardViewController {
   func buildInterface() {
-    view.backgroundColor = Self.keyboardBackgroundColor
+    view.backgroundColor = .clear
+    view.isOpaque = false
+
 
     let height = view.heightAnchor.constraint(
       equalToConstant: preferredKeyboardHeight
@@ -15,20 +16,21 @@ extension KeyboardViewController {
 
     rootStack.axis = .vertical
     rootStack.alignment = .fill
-    rootStack.spacing = 7
+    rootStack.spacing = 4
     rootStack.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(rootStack)
 
     NSLayoutConstraint.activate([
-      rootStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
-      rootStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
-      rootStack.topAnchor.constraint(equalTo: view.topAnchor, constant: 5),
+      rootStack.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      rootStack.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      rootStack.topAnchor.constraint(equalTo: view.topAnchor, constant: 2),
       rootStack.bottomAnchor.constraint(
-        equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -5),
+        equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: 0),
     ])
 
     let toolbar = makeToolbar()
     makeRecordingPanel()
+    configureInsertLatestButton()
 
     typingStack.axis = .vertical
     typingStack.alignment = .fill
@@ -41,7 +43,7 @@ extension KeyboardViewController {
     rootStack.addArrangedSubview(recordingPanel)
     rootStack.addArrangedSubview(typingStack)
 
-    toolbar.heightAnchor.constraint(equalToConstant: 44).isActive = true
+    toolbar.heightAnchor.constraint(equalToConstant: 40).isActive = true
     insertLatestButton.heightAnchor.constraint(equalToConstant: 42).isActive = true
     insertLatestButton.isHidden = true
     recordingPanel.isHidden = true
@@ -50,13 +52,14 @@ extension KeyboardViewController {
   var preferredKeyboardHeight: CGFloat {
     let contentHeight: CGFloat
     if traitCollection.horizontalSizeClass == .regular {
-      contentHeight = 320
+      contentHeight = 300
     } else if traitCollection.verticalSizeClass == .compact {
-      contentHeight = 216
+      contentHeight = 196
     } else {
-      contentHeight = 274
+      let isLargePhone = (view.window?.bounds.width ?? view.bounds.width) > 400
+      contentHeight = isLargePhone ? 254 : 244
     }
-    let resultBannerHeight: CGFloat = insertLatestButton.isHidden ? 0 : 49
+    let resultBannerHeight: CGFloat = insertLatestButton.isHidden ? 0 : 45
     return contentHeight + resultBannerHeight + view.safeAreaInsets.bottom
   }
 
@@ -67,108 +70,37 @@ extension KeyboardViewController {
   }
 
   func makeToolbar() -> UIView {
-    let stack = UIStackView()
-    stack.axis = .horizontal
-    stack.alignment = .center
-    stack.spacing = 7
-
-    brandMarkView.translatesAutoresizingMaskIntoConstraints = false
-    NSLayoutConstraint.activate([
-      brandMarkView.widthAnchor.constraint(equalToConstant: 38),
-      brandMarkView.heightAnchor.constraint(equalToConstant: 38),
-    ])
-    brandMarkView.tapHandler = { [weak self] in
-      self?.openContainingAppFromBrandMark()
+    if let previous = toolbarHostingController {
+      previous.willMove(toParent: nil)
+      previous.view.removeFromSuperview()
+      previous.removeFromParent()
+      toolbarHostingController = nil
     }
 
-    let spacer = UIView()
-    spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-    spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    toolbarState.onBrandTap = { [weak self] in
+      self?.openContainingAppFromBrandMark()
+    }
+    toolbarState.onMicrophoneTap = { [weak self] in
+      self?.microphoneTapped()
+    }
+    toolbarState.onTranslateTap = { [weak self] in
+      self?.translateTapped()
+    }
+    toolbarState.onCancelTap = { [weak self] in
+      self?.cancelTapped()
+    }
 
-    timerLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-    timerLabel.textColor = .systemRed
-    timerLabel.textAlignment = .right
-    timerLabel.isHidden = true
-    let timerWidth = timerLabel.widthAnchor.constraint(equalToConstant: 44)
-    timerWidth.priority = .defaultHigh
-    timerWidth.isActive = true
-
-    processingStatusStack.axis = .horizontal
-    processingStatusStack.alignment = .center
-    processingStatusStack.spacing = 6
-    processingStatusStack.isHidden = true
-    processingStatusStack.isAccessibilityElement = true
-    processingStatusStack.accessibilityIdentifier = "keyboard-processing-status"
-    processingStatusStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
-    processingStatusStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-    processingIndicator.color = .systemCyan
-    processingIndicator.hidesWhenStopped = true
-
-    processingLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-    processingLabel.textColor = Self.keyForegroundColor
-    processingLabel.lineBreakMode = .byTruncatingTail
-    processingLabel.adjustsFontSizeToFitWidth = true
-    processingLabel.minimumScaleFactor = 0.78
-    processingLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-    processingStatusStack.addArrangedSubview(processingIndicator)
-    processingStatusStack.addArrangedSubview(processingLabel)
-
-    stack.addArrangedSubview(brandMarkView)
-    stack.addArrangedSubview(processingStatusStack)
-    stack.addArrangedSubview(spacer)
-    stack.addArrangedSubview(timerLabel)
-    stack.addArrangedSubview(makeDictationRow())
-    return stack
+    let hosting = UIHostingController(rootView: KeyboardToolbarView(state: toolbarState))
+    hosting.view.backgroundColor = .clear
+    hosting.view.isOpaque = false
+    hosting.view.translatesAutoresizingMaskIntoConstraints = false
+    addChild(hosting)
+    hosting.didMove(toParent: self)
+    toolbarHostingController = hosting
+    return hosting.view
   }
 
-  func makeDictationRow() -> UIStackView {
-    let stack = UIStackView()
-    stack.axis = .horizontal
-    stack.alignment = .center
-    stack.spacing = 6
-
-    var micConfiguration = UIButton.Configuration.filled()
-    micConfiguration.cornerStyle = .capsule
-    micConfiguration.baseBackgroundColor = .systemBlue
-    micConfiguration.baseForegroundColor = .white
-    micConfiguration.image = UIImage(systemName: "mic.fill")
-    micConfiguration.contentInsets = .zero
-    microphoneButton.configuration = micConfiguration
-    microphoneButton.accessibilityLabel = "Start Gemini dictation"
-    microphoneButton.accessibilityIdentifier = "keyboard-dictate-button"
-    microphoneButton.addTarget(self, action: #selector(microphoneTapped), for: .touchUpInside)
-    microphoneButton.translatesAutoresizingMaskIntoConstraints = false
-    prepareActionButton(microphoneButton)
-
-    var cancelConfiguration = UIButton.Configuration.tinted()
-    cancelConfiguration.cornerStyle = .capsule
-    cancelConfiguration.baseBackgroundColor = .systemRed
-    cancelConfiguration.baseForegroundColor = .systemRed
-    cancelConfiguration.image = UIImage(systemName: "xmark")
-    cancelConfiguration.contentInsets = .zero
-    cancelButton.configuration = cancelConfiguration
-    cancelButton.accessibilityLabel = "Stop voice or translation and discard the result"
-    cancelButton.accessibilityHint =
-      "Stops an active Live stream or discards a pending recording without inserting text"
-    cancelButton.accessibilityIdentifier = "keyboard-cancel-button"
-    cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
-    cancelButton.isEnabled = false
-    prepareActionButton(cancelButton)
-
-    var translateConfiguration = UIButton.Configuration.filled()
-    translateConfiguration.cornerStyle = .capsule
-    translateConfiguration.baseBackgroundColor = .systemIndigo
-    translateConfiguration.baseForegroundColor = .white
-    translateConfiguration.image = UIImage(systemName: "character.bubble.fill")
-    translateConfiguration.contentInsets = .zero
-    translateButton.configuration = translateConfiguration
-    translateButton.accessibilityIdentifier = "keyboard-translate-button"
-    translateButton.addTarget(self, action: #selector(translateTapped), for: .touchUpInside)
-    prepareActionButton(translateButton)
-    configureTranslationButton()
-
+  func configureInsertLatestButton() {
     var insertConfiguration = UIButton.Configuration.tinted()
     insertConfiguration.cornerStyle = .capsule
     insertConfiguration.baseBackgroundColor = .systemCyan
@@ -183,23 +115,26 @@ extension KeyboardViewController {
     insertLatestButton.translatesAutoresizingMaskIntoConstraints = false
     insertLatestButton.isHidden = true
     prepareActionButton(insertLatestButton)
-
-    stack.addArrangedSubview(microphoneButton)
-    stack.addArrangedSubview(translateButton)
-    stack.addArrangedSubview(cancelButton)
-    for button in [microphoneButton, translateButton, cancelButton] {
-      NSLayoutConstraint.activate([
-        button.widthAnchor.constraint(equalToConstant: 44),
-        button.heightAnchor.constraint(equalToConstant: 44),
-      ])
-    }
-    return stack
   }
 
   func makeRecordingPanel() {
-    recordingPanel.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.58)
+    recordingPanel.backgroundColor = UIColor { traits in
+      traits.userInterfaceStyle == .dark
+        ? UIColor(white: 0.18, alpha: 0.85)
+        : UIColor(white: 0.94, alpha: 0.85)
+    }
     recordingPanel.layer.cornerRadius = 20
     recordingPanel.layer.cornerCurve = .continuous
+    recordingPanel.layer.borderWidth = 0.5
+    recordingPanel.layer.borderColor = UIColor { traits in
+      traits.userInterfaceStyle == .dark
+        ? UIColor(white: 1.0, alpha: 0.18)
+        : UIColor(white: 1.0, alpha: 0.60)
+    }.cgColor
+    recordingPanel.layer.shadowColor = UIColor.black.cgColor
+    recordingPanel.layer.shadowOpacity = 0.14
+    recordingPanel.layer.shadowRadius = 8
+    recordingPanel.layer.shadowOffset = CGSize(width: 0, height: 3)
     recordingPanel.accessibilityIdentifier = "keyboard-recording-panel"
 
     waveformView.translatesAutoresizingMaskIntoConstraints = false
@@ -231,5 +166,13 @@ extension KeyboardViewController {
     button.isExclusiveTouch = true
     button.accessibilityTraits.insert(.button)
     button.layer.cornerCurve = .continuous
+    button.layer.shadowColor = UIColor.black.cgColor
+    button.layer.shadowRadius = 3
+    button.layer.borderWidth = 0.5
+    button.layer.borderColor = UIColor { traits in
+      traits.userInterfaceStyle == .dark
+        ? UIColor(white: 1.0, alpha: 0.22)
+        : UIColor(white: 1.0, alpha: 0.45)
+    }.cgColor
   }
 }

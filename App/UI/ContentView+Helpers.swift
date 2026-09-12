@@ -32,10 +32,9 @@ extension ContentView {
     content()
       .padding(18)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(.ultraThinMaterial.opacity(0.78))
-      .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+      .background(.ultraThinMaterial.opacity(0.78), in: .rect(cornerRadius: 22))
       .overlay {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
+        RoundedRectangle(cornerRadius: 22)
           .stroke(Color.white.opacity(0.08), lineWidth: 1)
       }
   }

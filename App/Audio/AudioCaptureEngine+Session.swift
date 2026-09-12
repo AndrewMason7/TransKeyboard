@@ -3,12 +3,17 @@ import Foundation
 
 extension AudioCaptureEngine {
   var sessionConfigurations: [SessionConfiguration] {
-    [
-      SessionConfiguration(
-        name: "AirPods high-quality",
-        mode: .default,
-        options: [.mixWithOthers, .allowBluetoothHFP, .bluetoothHighQualityRecording]
-      ),
+    var configurations: [SessionConfiguration] = []
+    if #available(iOS 26.0, *) {
+      configurations.append(
+        SessionConfiguration(
+          name: "AirPods high-quality",
+          mode: .default,
+          options: [.mixWithOthers, .allowBluetoothHFP, .bluetoothHighQualityRecording]
+        )
+      )
+    }
+    configurations.append(contentsOf: [
       SessionConfiguration(
         name: "Bluetooth mixed",
         mode: .default,
@@ -24,7 +29,8 @@ extension AudioCaptureEngine {
         mode: .default,
         options: [.mixWithOthers]
       ),
-    ]
+    ])
+    return configurations
   }
 
   func reportRecoverableRecordings() {

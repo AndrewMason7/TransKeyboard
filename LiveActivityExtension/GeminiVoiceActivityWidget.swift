@@ -96,7 +96,7 @@ struct GeminiVoiceActivityWidget: Widget {
 
   private var brandIcon: some View {
     ZStack {
-      RoundedRectangle(cornerRadius: 13, style: .continuous)
+      RoundedRectangle(cornerRadius: 13)
         .fill(
           LinearGradient(
             colors: [.cyan, .blue, .purple],

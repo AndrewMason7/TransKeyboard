@@ -5,7 +5,7 @@ extension ContentView {
   var header: some View {
     HStack(spacing: 14) {
       ZStack {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
+        RoundedRectangle(cornerRadius: 18)
           .fill(
             LinearGradient(
               colors: [.cyan, .blue, .purple],
@@ -66,13 +66,7 @@ extension ContentView {
           }
         }
 
-        Button {
-          if relay.isRelayRunning {
-            relay.stopRelay()
-          } else {
-            Task { await relay.startRelay() }
-          }
-        } label: {
+        Button(action: toggleRelayState) {
           HStack(spacing: 10) {
             Image(systemName: relay.isRelayRunning ? "stop.fill" : "mic.fill")
             Text(
@@ -91,12 +85,20 @@ extension ContentView {
               ? Color.white.opacity(0.12)
               : Color.blue
           )
-          .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+          .clipShape(.rect(cornerRadius: 14))
         }
         .buttonStyle(.plain)
         .disabled(relay.isRelayStarting)
         .accessibilityIdentifier("relay-control-button")
       }
+    }
+  }
+
+  private func toggleRelayState() {
+    if relay.isRelayRunning {
+      relay.stopRelay()
+    } else {
+      Task { await relay.startRelay() }
     }
   }
 

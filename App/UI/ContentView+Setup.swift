@@ -18,7 +18,7 @@ extension ContentView {
 
         Button("Open Gemini Voice Settings") {
           guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-          UIApplication.shared.open(url)
+          openURL(url)
         }
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(.cyan)

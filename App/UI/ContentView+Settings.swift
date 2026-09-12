@@ -40,7 +40,9 @@ extension ContentView {
           }
 
           Divider()
-            .overlay(Color.white.opacity(0.12))
+            .overlay {
+              Color.white.opacity(0.12)
+            }
 
           VStack(alignment: .leading, spacing: 3) {
             Label("Translate is always available", systemImage: "character.bubble.fill")
@@ -93,7 +95,7 @@ extension ContentView {
             .autocorrectionDisabled()
             .padding(12)
             .background(Color.black.opacity(0.22))
-            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .clipShape(.rect(cornerRadius: 11))
             .accessibilityIdentifier("api-key-field")
 
           HStack {

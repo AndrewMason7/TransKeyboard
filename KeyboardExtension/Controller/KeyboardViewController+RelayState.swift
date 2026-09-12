@@ -30,17 +30,25 @@ extension KeyboardViewController {
 
     if mode == .recording, let startedAt = snapshot.recordingStartedAt {
       let elapsed = max(0, Int(Date().timeIntervalSince(startedAt)))
-      timerLabel.text = String(format: "%d:%02d", elapsed / 60, elapsed % 60)
+      let formatted = String(format: "%d:%02d", elapsed / 60, elapsed % 60)
+      timerLabel.text = formatted
       timerLabel.isHidden = false
+      toolbarState.timerText = formatted
     } else {
       timerLabel.isHidden = true
+      toolbarState.timerText = nil
     }
 
     guard hasFullAccess else {
       setStatus("Enable Allow Full Access in Settings", color: .systemOrange)
-      microphoneButton.isEnabled = false
-      translateButton.isEnabled = false
-      cancelButton.isEnabled = false
+      toolbarState.applySync(
+        mode: mode,
+        activeAction: activeDictationAction,
+        isMicrophoneEnabled: false,
+        isTranslateEnabled: false,
+        isCancelEnabled: false,
+        timerText: nil
+      )
       return
     }
 
@@ -75,9 +83,14 @@ extension KeyboardViewController {
           color: .systemGray
         )
         configureTranslationButton(color: .systemGray)
-        microphoneButton.isEnabled = false
-        translateButton.isEnabled = false
-        cancelButton.isEnabled = true
+        toolbarState.applySync(
+          mode: mode,
+          activeAction: activeDictationAction,
+          isMicrophoneEnabled: false,
+          isTranslateEnabled: false,
+          isCancelEnabled: true,
+          timerText: timerLabel.isHidden ? nil : timerLabel.text
+        )
       } else {
         let launchFailed = hostLaunchFailureExpiresAt.map { $0 > Date() } ?? false
         let unavailableMessage: String?
@@ -101,9 +114,14 @@ extension KeyboardViewController {
           color: .systemBlue
         )
         configureTranslationButton()
-        microphoneButton.isEnabled = true
-        translateButton.isEnabled = keyboardTranslationEnabled
-        cancelButton.isEnabled = false
+        toolbarState.applySync(
+          mode: mode,
+          activeAction: activeDictationAction,
+          isMicrophoneEnabled: true,
+          isTranslateEnabled: keyboardTranslationEnabled,
+          isCancelEnabled: false,
+          timerText: timerLabel.isHidden ? nil : timerLabel.text
+        )
       }
       return
     }
@@ -113,9 +131,14 @@ extension KeyboardViewController {
       setStatus("Starting dictation — × cancels", color: .systemCyan)
       configureMicrophone(title: "Starting…", image: "waveform", color: .systemGray)
       configureTranslationButton(color: .systemGray)
-      microphoneButton.isEnabled = false
-      translateButton.isEnabled = false
-      cancelButton.isEnabled = true
+      toolbarState.applySync(
+        mode: mode,
+        activeAction: activeDictationAction,
+        isMicrophoneEnabled: false,
+        isTranslateEnabled: false,
+        isCancelEnabled: true,
+        timerText: timerLabel.isHidden ? nil : timerLabel.text
+      )
     case .recording:
       let livePreview =
         snapshot.activeRequestID == activeRequestID
@@ -126,35 +149,55 @@ extension KeyboardViewController {
         setStatus(livePreview ?? "Listening — Translate finishes; × discards", color: .systemRed)
         configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemBlue)
         configureTranslationButton(title: "Finish", image: "arrow.up", color: .systemIndigo)
-        microphoneButton.isEnabled = false
-        translateButton.isEnabled = true
+        toolbarState.applySync(
+          mode: mode,
+          activeAction: activeDictationAction,
+          isMicrophoneEnabled: false,
+          isTranslateEnabled: true,
+          isCancelEnabled: true,
+          timerText: timerLabel.isHidden ? nil : timerLabel.text
+        )
       } else {
         setStatus(livePreview ?? "Listening — Finish inserts; × discards", color: .systemRed)
         configureMicrophone(title: "Finish", image: "arrow.up", color: .systemBlue)
         configureTranslationButton()
-        microphoneButton.isEnabled = true
-        translateButton.isEnabled = false
+        toolbarState.applySync(
+          mode: mode,
+          activeAction: activeDictationAction,
+          isMicrophoneEnabled: true,
+          isTranslateEnabled: false,
+          isCancelEnabled: true,
+          timerText: timerLabel.isHidden ? nil : timerLabel.text
+        )
       }
-      cancelButton.isEnabled = true
     case .cancelling:
       setStatus("Stopping and discarding the result", color: .systemOrange)
       configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemGray)
       configureTranslationButton(color: .systemGray)
-      microphoneButton.isEnabled = false
-      translateButton.isEnabled = false
-      cancelButton.isEnabled = false
+      toolbarState.applySync(
+        mode: mode,
+        activeAction: activeDictationAction,
+        isMicrophoneEnabled: false,
+        isTranslateEnabled: false,
+        isCancelEnabled: false,
+        timerText: timerLabel.isHidden ? nil : timerLabel.text
+      )
     case .transcribing:
       if snapshot.status == .error {
-        cancelButton.isEnabled = false
         mode = .idle
         clearTrackedRequest()
         setStatus(snapshot.message, color: .systemOrange)
         configureMicrophone(title: "Try again", image: "mic.fill", color: .systemBlue)
         configureTranslationButton()
-        microphoneButton.isEnabled = true
-        translateButton.isEnabled = keyboardTranslationEnabled
+        toolbarState.applySync(
+          mode: mode,
+          activeAction: activeDictationAction,
+          isMicrophoneEnabled: true,
+          isTranslateEnabled: keyboardTranslationEnabled,
+          isCancelEnabled: false,
+          timerText: timerLabel.isHidden ? nil : timerLabel.text
+        )
       } else {
-        cancelButton.isEnabled = true
         setStatus(snapshot.message, color: .systemCyan)
         if activeDictationAction == .translate {
           configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemBlue)
@@ -163,8 +206,14 @@ extension KeyboardViewController {
           configureMicrophone(title: "Transcribing", image: "ellipsis", color: .systemGray)
           configureTranslationButton()
         }
-        microphoneButton.isEnabled = false
-        translateButton.isEnabled = false
+        toolbarState.applySync(
+          mode: mode,
+          activeAction: activeDictationAction,
+          isMicrophoneEnabled: false,
+          isTranslateEnabled: false,
+          isCancelEnabled: true,
+          timerText: timerLabel.isHidden ? nil : timerLabel.text
+        )
       }
     case .resultWaiting:
       setStatus(
@@ -175,19 +224,37 @@ extension KeyboardViewController {
       )
       configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemBlue)
       configureTranslationButton()
-      microphoneButton.isEnabled = true
-      translateButton.isEnabled = keyboardTranslationEnabled
-      cancelButton.isEnabled = false
+      toolbarState.applySync(
+        mode: mode,
+        activeAction: activeDictationAction,
+        isMicrophoneEnabled: true,
+        isTranslateEnabled: keyboardTranslationEnabled,
+        isCancelEnabled: false,
+        timerText: timerLabel.isHidden ? nil : timerLabel.text
+      )
     case .idle:
       setStatus(
         snapshot.status == .error ? snapshot.message : "Ready for Gemini dictation",
         color: snapshot.status == .error ? .systemOrange : .systemGreen)
       configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemBlue)
       configureTranslationButton()
-      microphoneButton.isEnabled = true
-      translateButton.isEnabled = keyboardTranslationEnabled
-      cancelButton.isEnabled = false
+      toolbarState.applySync(
+        mode: mode,
+        activeAction: activeDictationAction,
+        isMicrophoneEnabled: true,
+        isTranslateEnabled: keyboardTranslationEnabled,
+        isCancelEnabled: false,
+        timerText: timerLabel.isHidden ? nil : timerLabel.text
+      )
     }
+  }
+
+  func syncToolbarState() {
+    toolbarState.applySync(
+      mode: mode,
+      activeAction: activeDictationAction,
+      timerText: timerLabel.isHidden ? nil : timerLabel.text
+    )
   }
 
   func issueDeferredStartIfReady(with snapshot: RelaySnapshot) {

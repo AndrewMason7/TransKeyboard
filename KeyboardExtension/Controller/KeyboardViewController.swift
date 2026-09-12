@@ -1,5 +1,6 @@
 import CryptoKit
 import Darwin
+import SwiftUI
 import UIKit
 
 final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedback {
@@ -62,15 +63,10 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
   let waveformView = LiveWaveformView()
   let recordingTitleLabel = UILabel()
   var keyboardHeightConstraint: NSLayoutConstraint?
-  let brandMarkView = KeyboardBrandMarkView()
-  let processingStatusStack = UIStackView()
-  let processingIndicator = UIActivityIndicatorView(style: .medium)
-  let processingLabel = UILabel()
   let timerLabel = UILabel()
-  let microphoneButton = KeyboardButton(type: .system)
-  let translateButton = KeyboardButton(type: .system)
-  let cancelButton = KeyboardButton(type: .system)
   let insertLatestButton = KeyboardButton(type: .system)
+  let toolbarState = KeyboardToolbarState()
+  var toolbarHostingController: UIHostingController<KeyboardToolbarView>?
 
   var enableInputClicksWhenVisible: Bool { true }
 
@@ -93,12 +89,24 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
 
   override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
+    view.backgroundColor = .clear
+    view.isOpaque = false
+    inputView?.backgroundColor = .clear
+    inputView?.isOpaque = false
+    view.superview?.backgroundColor = .clear
+    view.superview?.isOpaque = false
     syncKeyboardSurfaceContext()
     updateAutomaticCapitalization()
   }
 
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
+    view.backgroundColor = .clear
+    view.isOpaque = false
+    inputView?.backgroundColor = .clear
+    inputView?.isOpaque = false
+    view.superview?.backgroundColor = .clear
+    view.superview?.isOpaque = false
     keyboardActivationGeneration += 1
     keyboardIsVisible = true
     if awaitsKeyboardReactivation {
@@ -119,7 +127,7 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
     keyboardSettleWorkItem = nil
     keyboardIsVisible = false
     keyboardReactivationIsReady = false
-    processingIndicator.stopAnimating()
+    toolbarState.updateProcessing(isProcessing: false, isError: false, message: nil)
     pollingTimer?.invalidate()
     pollingTimer = nil
     keyboardSurface.resetTransientState()
@@ -134,12 +142,6 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
   override func viewSafeAreaInsetsDidChange() {
     super.viewSafeAreaInsetsDidChange()
     updateKeyboardHeight()
-  }
-
-  static let keyboardBackgroundColor = UIColor { traits in
-    traits.userInterfaceStyle == .dark
-      ? UIColor(red: 0.12, green: 0.13, blue: 0.15, alpha: 1)
-      : UIColor(red: 0.82, green: 0.84, blue: 0.87, alpha: 1)
   }
 
   static let keyForegroundColor = UIColor { traits in

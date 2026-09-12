@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct ContentView: View {
+  @Environment(\.openURL) var openURL
   @ObservedObject var configuration: AppConfiguration
   @ObservedObject var relay: RelayController
 
@@ -61,24 +62,14 @@ struct ContentView: View {
     }
     .confirmationDialog(
       "Delete this saved recording?",
-      isPresented: Binding(
-        get: { recordingPendingDeletion != nil },
-        set: { presented in
-          if !presented { recordingPendingDeletion = nil }
-        }
-      ),
+      item: $recordingPendingDeletion,
       titleVisibility: .visible
-    ) {
+    ) { recording in
       Button("Delete Recording", role: .destructive) {
-        if let recordingPendingDeletion {
-          relay.deleteRecording(recordingPendingDeletion)
-        }
-        recordingPendingDeletion = nil
+        relay.deleteRecording(recording)
       }
-      Button("Keep Recording", role: .cancel) {
-        recordingPendingDeletion = nil
-      }
-    } message: {
+      Button("Keep Recording", role: .cancel) {}
+    } message: { _ in
       Text("This permanently removes the local audio clip.")
     }
   }

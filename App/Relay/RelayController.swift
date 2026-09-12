@@ -23,7 +23,7 @@ enum RelayIdleShutdownPolicy {
 
 @MainActor
 final class RelayController: ObservableObject {
-  static let maximumDictationDuration: TimeInterval = 45
+  static let maximumDictationDuration: TimeInterval = 5 * 60
 
   struct PendingHostReturn: Equatable {
     let requestID: String

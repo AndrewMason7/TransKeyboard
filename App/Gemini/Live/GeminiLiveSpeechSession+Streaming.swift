@@ -31,8 +31,8 @@ extension GeminiLiveSpeechSession {
   }
 
   func bufferPendingAudio(_ data: Data) {
-    // Slightly more than 45 seconds of 16 kHz mono Int16 PCM. This bounds
-    // memory if setup stalls while the microphone continues recording.
+    // Setup normally resolves within five seconds. Keep a generous bounded
+    // buffer for startup jitter without retaining an entire long recording.
     let maximumBufferedBytes = 1_500_000
     guard pendingAudioByteCount + data.count <= maximumBufferedBytes else {
       terminalError = GeminiLiveSpeechError.service(

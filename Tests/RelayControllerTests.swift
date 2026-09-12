@@ -42,6 +42,10 @@ final class RelayControllerTests: XCTestCase {
   private var defaults: UserDefaults!
   private var directoryURL: URL!
 
+  func testMaximumDictationDurationIsFiveMinutes() {
+    XCTAssertEqual(RelayController.maximumDictationDuration, 5 * 60)
+  }
+
   override func setUpWithError() throws {
     try super.setUpWithError()
     suiteName = "GeminiVoiceRelayControllerTests.\(UUID().uuidString)"

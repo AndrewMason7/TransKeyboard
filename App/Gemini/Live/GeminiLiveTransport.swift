@@ -100,9 +100,9 @@ final class URLSessionGeminiLiveSocket: GeminiLiveSocket, @unchecked Sendable {
   init(endpoint: GeminiLiveEndpoint, session: URLSession = .shared) {
     var request = URLRequest(url: endpoint.url)
     // This also governs WebSocket inactivity on current URLSession
-    // implementations. Keep it above the 45-second dictation ceiling;
+    // implementations. Keep it above the five-minute dictation ceiling;
     // setup and individual sends have their own shorter bounded waits.
-    request.timeoutInterval = 90
+    request.timeoutInterval = 6 * 60
     for (field, value) in endpoint.headers {
       request.setValue(value, forHTTPHeaderField: field)
     }

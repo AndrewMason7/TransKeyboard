@@ -796,20 +796,18 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
 
     switch key.action {
     case .backspace:
-      button.addTarget(self, action: #selector(deleteTouchDown), for: .touchDown)
-      button.addTarget(
-        self,
-        action: #selector(deleteTouchEnded),
-        for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit]
-      )
+      button.addAction(UIAction { [weak self] _ in self?.deleteTouchDown() }, for: .touchDown)
+      let endAction = UIAction { [weak self] _ in self?.deleteTouchEnded() }
+      button.addAction(endAction, for: .touchUpInside)
+      button.addAction(endAction, for: .touchUpOutside)
+      button.addAction(endAction, for: .touchCancel)
+      button.addAction(endAction, for: .touchDragExit)
     case .space:
-      button.addTarget(self, action: #selector(spaceTouchDown), for: .touchDown)
-      button.addTarget(self, action: #selector(spaceTouchUpInside), for: .touchUpInside)
-      button.addTarget(
-        self,
-        action: #selector(spaceTouchCancelled),
-        for: [.touchUpOutside, .touchCancel]
-      )
+      button.addAction(UIAction { [weak self] _ in self?.spaceTouchDown() }, for: .touchDown)
+      button.addAction(UIAction { [weak self] _ in self?.spaceTouchUpInside() }, for: .touchUpInside)
+      let cancelAction = UIAction { [weak self] _ in self?.spaceTouchCancelled() }
+      button.addAction(cancelAction, for: .touchUpOutside)
+      button.addAction(cancelAction, for: .touchCancel)
       let pan = UIPanGestureRecognizer(target: self, action: #selector(spacePanned(_:)))
       pan.cancelsTouchesInView = false
       pan.delaysTouchesEnded = false
@@ -822,13 +820,18 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
         for: .allTouchEvents
       )
     default:
-      button.addTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
-      button.addTarget(self, action: #selector(keyTouchUp(_:)), for: .touchUpInside)
-      button.addTarget(
-        self,
-        action: #selector(keyTouchCancelled),
-        for: [.touchUpOutside, .touchCancel, .touchDragExit]
-      )
+      button.addAction(UIAction { [weak self, weak button] _ in
+        guard let self, let button else { return }
+        self.keyTouchDown(button)
+      }, for: .touchDown)
+      button.addAction(UIAction { [weak self, weak button] _ in
+        guard let self, let button else { return }
+        self.keyTouchUp(button)
+      }, for: .touchUpInside)
+      let cancelAction = UIAction { [weak self] _ in self?.keyTouchCancelled() }
+      button.addAction(cancelAction, for: .touchUpOutside)
+      button.addAction(cancelAction, for: .touchCancel)
+      button.addAction(cancelAction, for: .touchDragExit)
       if case .text(let text) = key.action {
         let options = interactionState.alternateCharacters(for: text)
         if options.count > 1 {
@@ -846,17 +849,17 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     return button
   }
 
-  @objc func keyTouchDown(_ sender: KeyboardKeyButton) {
+  func keyTouchDown(_ sender: KeyboardKeyButton) {
     guard case .text(let text) = sender.key.action else { return }
     inputCallout.show(text: text, above: sender, in: self)
   }
 
-  @objc func keyTouchUp(_ sender: KeyboardKeyButton) {
+  func keyTouchUp(_ sender: KeyboardKeyButton) {
     inputCallout.hide(animated: true)
     activate(sender.key.action)
   }
 
-  @objc func keyTouchCancelled() {
+  func keyTouchCancelled() {
     inputCallout.hide(animated: true)
   }
 
@@ -895,7 +898,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     }
   }
 
-  @objc private func deleteTouchDown() {
+  private func deleteTouchDown() {
     activate(.backspace)
     stopDeleteRepeat()
     isDeleting = true
@@ -919,7 +922,7 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     RunLoop.main.add(delay, forMode: .common)
   }
 
-  @objc private func deleteTouchEnded() {
+  private func deleteTouchEnded() {
     stopDeleteRepeat()
   }
 
@@ -937,20 +940,20 @@ final class KeyboardSurfaceView: UIView, UIGestureRecognizerDelegate {
     deleteRepeatTimer = nil
   }
 
-  @objc private func spaceTouchDown() {
+  private func spaceTouchDown() {
     spaceDidMove = false
     lastSpaceStep = 0
     selectionFeedbackGenerator.prepare()
   }
 
-  @objc private func spaceTouchUpInside() {
+  private func spaceTouchUpInside() {
     if !spaceDidMove {
       activate(.space)
     }
     lastSpaceStep = 0
   }
 
-  @objc private func spaceTouchCancelled() {
+  private func spaceTouchCancelled() {
     spaceDidMove = false
     lastSpaceStep = 0
   }

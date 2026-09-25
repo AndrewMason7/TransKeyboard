@@ -111,7 +111,7 @@ extension KeyboardViewController {
         configureMicrophone(
           title: "Open & dictate",
           image: "arrow.up.forward.app.fill",
-          color: .systemBlue
+          color: GeminiVoiceTheme.accentUIColor
         )
         configureTranslationButton()
         toolbarState.applySync(
@@ -147,8 +147,8 @@ extension KeyboardViewController {
         : nil
       if activeDictationAction == .translate {
         setStatus(livePreview ?? "Listening — Translate finishes; × discards", color: .systemRed)
-        configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemBlue)
-        configureTranslationButton(title: "Finish", image: "arrow.up", color: .systemIndigo)
+        configureMicrophone(title: "Dictate", image: "mic.fill", color: GeminiVoiceTheme.accentUIColor)
+        configureTranslationButton(title: "Finish", image: "arrow.up", color: GeminiVoiceTheme.translationUIAccent)
         toolbarState.applySync(
           mode: mode,
           activeAction: activeDictationAction,
@@ -159,7 +159,7 @@ extension KeyboardViewController {
         )
       } else {
         setStatus(livePreview ?? "Listening — Finish inserts; × discards", color: .systemRed)
-        configureMicrophone(title: "Finish", image: "arrow.up", color: .systemBlue)
+        configureMicrophone(title: "Finish", image: "arrow.up", color: GeminiVoiceTheme.accentUIColor)
         configureTranslationButton()
         toolbarState.applySync(
           mode: mode,
@@ -187,7 +187,7 @@ extension KeyboardViewController {
         mode = .idle
         clearTrackedRequest()
         setStatus(snapshot.message, color: .systemOrange)
-        configureMicrophone(title: "Try again", image: "mic.fill", color: .systemBlue)
+        configureMicrophone(title: "Try again", image: "mic.fill", color: GeminiVoiceTheme.accentUIColor)
         configureTranslationButton()
         toolbarState.applySync(
           mode: mode,
@@ -200,7 +200,7 @@ extension KeyboardViewController {
       } else {
         setStatus(snapshot.message, color: .systemCyan)
         if activeDictationAction == .translate {
-          configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemBlue)
+          configureMicrophone(title: "Dictate", image: "mic.fill", color: GeminiVoiceTheme.accentUIColor)
           configureTranslationButton(title: "…", image: "ellipsis", color: .systemGray)
         } else {
           configureMicrophone(title: "Transcribing", image: "ellipsis", color: .systemGray)
@@ -222,7 +222,7 @@ extension KeyboardViewController {
           : "Text field changed — tap Insert latest",
         color: .systemCyan
       )
-      configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemBlue)
+      configureMicrophone(title: "Dictate", image: "mic.fill", color: GeminiVoiceTheme.accentUIColor)
       configureTranslationButton()
       toolbarState.applySync(
         mode: mode,
@@ -236,7 +236,7 @@ extension KeyboardViewController {
       setStatus(
         snapshot.status == .error ? snapshot.message : "Ready for Gemini dictation",
         color: snapshot.status == .error ? .systemOrange : .systemGreen)
-      configureMicrophone(title: "Dictate", image: "mic.fill", color: .systemBlue)
+      configureMicrophone(title: "Dictate", image: "mic.fill", color: GeminiVoiceTheme.accentUIColor)
       configureTranslationButton()
       toolbarState.applySync(
         mode: mode,

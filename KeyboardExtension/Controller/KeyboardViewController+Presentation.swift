@@ -50,7 +50,7 @@ extension KeyboardViewController {
   func configureTranslationButton(
     title: String? = nil,
     image: String = "character.bubble.fill",
-    color: UIColor = .systemIndigo
+    color: UIColor = GeminiVoiceTheme.translationUIAccent
   ) {
     let target = keyboardTranslationTarget
     let accessibilityLabel: String
@@ -112,13 +112,26 @@ extension KeyboardViewController {
     toolbarState.cancelAccessibilityHint = hint
   }
 
+  var activeSpeechEngineMode: SpeechEngineMode {
+    let raw = sharedPreferences.string(forKey: SpeechEngineMode.sharedDefaultsKey)
+    return raw.flatMap(SpeechEngineMode.init(rawValue:)) ?? .defaultMode
+  }
+
+  var activeRawModelIdentifier: String {
+    let raw = sharedPreferences.string(forKey: SpeechEngineMode.activeModelIdentifierKey)
+    if let raw, !raw.isEmpty {
+      return raw
+    }
+    return activeSpeechEngineMode == .localOnDevice ? "gemma-4-E2B-it.litert-lm" : SpeechEngineMode.defaultModelIdentifier
+  }
+
   func updateRecordingPresentation(with snapshot: RelaySnapshot) {
     let isRecording = mode == .recording
     recordingPanel.isHidden = !isRecording
     typingStack.isHidden = isRecording
 
     guard isRecording else {
-      waveformView.setLevel(0, active: false)
+      recordingCardState.audioVisualizer.updateAudioLevel(0)
       toolbarState.updateAudioLevel(0)
       return
     }
@@ -128,12 +141,16 @@ extension KeyboardViewController {
         Date().timeIntervalSince($0) >= 0 && Date().timeIntervalSince($0) < 0.8
       } ?? false
     let currentLevel = levelIsFresh ? CGFloat(snapshot.audioLevel) : 0
-    waveformView.setLevel(currentLevel, active: true)
     toolbarState.updateAudioLevel(currentLevel)
-    recordingTitleLabel.text =
+
+    let rawModel = activeRawModelIdentifier
+    recordingCardState.modeName = rawModel
+    recordingCardState.modeIcon = SpeechEngineMode.iconName(for: rawModel)
+    recordingCardState.title =
       activeDictationAction == .translate
       ? "Listening to translate"
       : "Listening"
+    recordingCardState.audioVisualizer.updateAudioLevel(currentLevel)
   }
 
   func updateProcessingPresentation(with snapshot: RelaySnapshot) {

@@ -3,7 +3,7 @@ import Darwin
 import UIKit
 
 extension KeyboardViewController {
-  @objc func cancelTapped() {
+  func cancelTapped() {
     guard let activeRequestID,
       let activeDictationAction
     else { return }
@@ -36,7 +36,7 @@ extension KeyboardViewController {
     refreshFromSharedState()
   }
 
-  @objc func insertLatestTapped() {
+  func insertLatestTapped() {
     guard let pendingTranscript else { return }
     insertTranscript(pendingTranscript)
     self.pendingTranscript = nil

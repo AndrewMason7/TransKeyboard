@@ -111,54 +111,43 @@ extension KeyboardViewController {
     insertLatestButton.configuration = insertConfiguration
     insertLatestButton.accessibilityLabel = "Insert the latest transcript"
     insertLatestButton.accessibilityIdentifier = "keyboard-insert-latest-button"
-    insertLatestButton.addTarget(self, action: #selector(insertLatestTapped), for: .touchUpInside)
+    insertLatestButton.addAction(
+      UIAction { [weak self] _ in
+        self?.insertLatestTapped()
+      },
+      for: .touchUpInside
+    )
     insertLatestButton.translatesAutoresizingMaskIntoConstraints = false
     insertLatestButton.isHidden = true
     prepareActionButton(insertLatestButton)
   }
 
   func makeRecordingPanel() {
-    recordingPanel.backgroundColor = UIColor { traits in
-      traits.userInterfaceStyle == .dark
-        ? UIColor(white: 0.18, alpha: 0.85)
-        : UIColor(white: 0.94, alpha: 0.85)
+    if let previous = recordingHostingController {
+      previous.willMove(toParent: nil)
+      previous.view.removeFromSuperview()
+      previous.removeFromParent()
+      recordingHostingController = nil
     }
-    recordingPanel.layer.cornerRadius = 20
-    recordingPanel.layer.cornerCurve = .continuous
-    recordingPanel.layer.borderWidth = 0.5
-    recordingPanel.layer.borderColor = UIColor { traits in
-      traits.userInterfaceStyle == .dark
-        ? UIColor(white: 1.0, alpha: 0.18)
-        : UIColor(white: 1.0, alpha: 0.60)
-    }.cgColor
-    recordingPanel.layer.shadowColor = UIColor.black.cgColor
-    recordingPanel.layer.shadowOpacity = 0.14
-    recordingPanel.layer.shadowRadius = 8
-    recordingPanel.layer.shadowOffset = CGSize(width: 0, height: 3)
+    recordingPanel.subviews.forEach { $0.removeFromSuperview() }
+    recordingPanel.backgroundColor = .clear
+    recordingPanel.isOpaque = false
     recordingPanel.accessibilityIdentifier = "keyboard-recording-panel"
 
-    waveformView.translatesAutoresizingMaskIntoConstraints = false
-    recordingPanel.addSubview(waveformView)
-
-    recordingTitleLabel.text = "Listening"
-    recordingTitleLabel.font = .systemFont(ofSize: 18, weight: .bold)
-    recordingTitleLabel.textAlignment = .center
-    recordingTitleLabel.textColor = Self.keyForegroundColor
-    recordingTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-    recordingPanel.addSubview(recordingTitleLabel)
+    let hosting = UIHostingController(rootView: KeyboardRecordingCardView(state: recordingCardState))
+    hosting.view.backgroundColor = .clear
+    hosting.view.isOpaque = false
+    hosting.view.translatesAutoresizingMaskIntoConstraints = false
+    addChild(hosting)
+    recordingPanel.addSubview(hosting.view)
+    hosting.didMove(toParent: self)
+    recordingHostingController = hosting
 
     NSLayoutConstraint.activate([
-      waveformView.leadingAnchor.constraint(equalTo: recordingPanel.leadingAnchor, constant: 18),
-      waveformView.trailingAnchor.constraint(equalTo: recordingPanel.trailingAnchor, constant: -18),
-      waveformView.topAnchor.constraint(equalTo: recordingPanel.topAnchor, constant: 12),
-      waveformView.heightAnchor.constraint(greaterThanOrEqualToConstant: 84),
-      recordingTitleLabel.topAnchor.constraint(equalTo: waveformView.bottomAnchor, constant: 4),
-      recordingTitleLabel.leadingAnchor.constraint(
-        equalTo: recordingPanel.leadingAnchor, constant: 16),
-      recordingTitleLabel.trailingAnchor.constraint(
-        equalTo: recordingPanel.trailingAnchor, constant: -16),
-      recordingTitleLabel.bottomAnchor.constraint(
-        lessThanOrEqualTo: recordingPanel.bottomAnchor, constant: -14),
+      hosting.view.leadingAnchor.constraint(equalTo: recordingPanel.leadingAnchor),
+      hosting.view.trailingAnchor.constraint(equalTo: recordingPanel.trailingAnchor),
+      hosting.view.topAnchor.constraint(equalTo: recordingPanel.topAnchor),
+      hosting.view.bottomAnchor.constraint(equalTo: recordingPanel.bottomAnchor),
     ])
   }
 

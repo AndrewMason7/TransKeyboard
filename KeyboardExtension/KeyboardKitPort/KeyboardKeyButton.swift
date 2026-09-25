@@ -71,17 +71,20 @@ final class KeyboardKeyButton: UIButton {
     }
   }
 
+  private var lastShadowBounds: CGRect = .zero
+
   override func layoutSubviews() {
     super.layoutSubviews()
-    if bounds.width > 0 && bounds.height > 0 {
-      if glassVisualEffectView == nil {
-        layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: layer.cornerRadius).cgPath
-      } else {
-        layer.shadowPath = nil
-      }
-      if let glassView = glassVisualEffectView {
+    guard bounds.width > 0 && bounds.height > 0 else { return }
+    if let glassView = glassVisualEffectView {
+      layer.shadowPath = nil
+      if glassView.frame != bounds {
         glassView.frame = bounds
-        sendSubviewToBack(glassView)
+      }
+    } else {
+      if layer.shadowPath == nil || lastShadowBounds != bounds {
+        lastShadowBounds = bounds
+        layer.shadowPath = UIBezierPath(roundedRect: bounds, cornerRadius: layer.cornerRadius).cgPath
       }
     }
   }
@@ -191,6 +194,7 @@ final class KeyboardKeyButton: UIButton {
         self.layer.shadowOpacity = self.isHighlighted ? 0.04 : (isSelectedShift ? 0.30 : defaultShadowOpacity)
         self.layer.shadowOffset = self.isHighlighted ? CGSize(width: 0, height: 0.5) : CGSize(width: 0, height: 1.0)
         self.layer.shadowRadius = 0
+        self.lastShadowBounds = self.bounds
         self.layer.shadowPath = UIBezierPath(roundedRect: self.bounds, cornerRadius: self.layer.cornerRadius).cgPath
       }
       self.alpha = self.isEnabled ? 1.0 : 0.38

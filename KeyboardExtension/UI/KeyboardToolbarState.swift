@@ -1,9 +1,10 @@
-import Combine
+import Observation
 import SwiftUI
 
+@Observable
 @MainActor
-final class KeyboardAudioVisualizerState: ObservableObject {
-  @Published var audioLevel: CGFloat = 0.0
+final class KeyboardAudioVisualizerState {
+  var audioLevel: CGFloat = 0.0
 
   func updateAudioLevel(_ level: CGFloat) {
     let safeLevel: CGFloat = (level.isFinite && !level.isNaN) ? max(0.0, min(1.0, level)) : 0.0
@@ -13,57 +14,67 @@ final class KeyboardAudioVisualizerState: ObservableObject {
   }
 }
 
+enum KeyboardDictationMode: Sendable {
+  case idle
+  case openingHost
+  case recording
+  case cancelling
+  case transcribing
+  case resultWaiting
+}
+
+@Observable
 @MainActor
-final class KeyboardToolbarState: ObservableObject {
-  @Published var mode: KeyboardViewController.DictationMode = .idle
-  @Published var activeAction: RelayDictationAction?
+final class KeyboardToolbarState {
+  var mode: KeyboardDictationMode = .idle
+  var activeAction: RelayDictationAction?
 
   // Microphone
-  @Published var isMicrophoneEnabled = true
-  @Published var microphoneImage = "mic.fill"
-  @Published var microphoneColor: Color = .blue
-  @Published var microphoneAccessibilityLabel = "Start Gemini dictation"
-  @Published var microphoneAccessibilityHint: String?
+  var isMicrophoneEnabled = true
+  var microphoneImage = "mic.fill"
+  var microphoneColor: Color = GeminiVoiceTheme.accentColor
+  var microphoneAccessibilityLabel = "Start Gemini dictation"
+  var microphoneAccessibilityHint: String?
 
   // Translation
-  @Published var isTranslateEnabled = true
-  @Published var isTranslateHidden = false
-  @Published var translateImage = "character.bubble.fill"
-  @Published var translateColor: Color = .indigo
-  @Published var targetLanguage: TranslationLanguage = .defaultLanguage
-  @Published var translateAccessibilityLabel = "Start dictation and translate"
-  @Published var translateAccessibilityHint: String?
+  var isTranslateEnabled = true
+  var isTranslateHidden = false
+  var translateImage = "character.bubble.fill"
+  var translateColor: Color = GeminiVoiceTheme.translationAccent
+  var targetLanguage: TranslationLanguage = .defaultLanguage
+  var translateAccessibilityLabel = "Start dictation and translate"
+  var translateAccessibilityHint: String?
 
   // Cancel
-  @Published var isCancelEnabled = false
-  @Published var isCancelHidden = true
-  @Published var cancelAccessibilityLabel = "Cancel"
-  @Published var cancelAccessibilityHint: String?
+  var isCancelEnabled = false
+  var isCancelHidden = true
+  var cancelAccessibilityLabel = "Cancel"
+  var cancelAccessibilityHint: String?
 
   // Processing & Status
-  @Published var isProcessing = false
-  @Published var processingMessage: String?
-  @Published var isProcessingError = false
-  @Published var brandStatusText: String?
-  @Published var brandStatusColor: Color?
+  var isProcessing = false
+  var processingMessage: String?
+  var isProcessingError = false
+  var brandStatusText: String?
+  var brandStatusColor: Color?
 
   // Live Timer
-  @Published var timerText: String?
+  var timerText: String?
 
   // Dedicated Audio Visualizer State (Isolated to prevent root toolbar re-renders)
   let audioVisualizer = KeyboardAudioVisualizerState()
   var audioLevel: CGFloat { audioVisualizer.audioLevel }
 
   // Action callbacks
-  var onBrandTap: (() -> Void)?
-  var onMicrophoneTap: (() -> Void)?
-  var onTranslateTap: (() -> Void)?
-  var onCancelTap: (() -> Void)?
+  @ObservationIgnored var onBrandTap: (() -> Void)?
+  @ObservationIgnored var onMicrophoneTap: (() -> Void)?
+  @ObservationIgnored var onTranslateTap: (() -> Void)?
+  @ObservationIgnored var onCancelTap: (() -> Void)?
 
   // MARK: - Atomic Mutators (Diff-Gated to Eliminate Redundant Publisher Emissions)
 
   func applySync(
-    mode: KeyboardViewController.DictationMode,
+    mode: KeyboardDictationMode,
     activeAction: RelayDictationAction?,
     isMicrophoneEnabled: Bool? = nil,
     isTranslateEnabled: Bool? = nil,

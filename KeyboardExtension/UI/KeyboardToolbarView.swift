@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct KeyboardToolbarView: View {
-  @ObservedObject var state: KeyboardToolbarState
+  var state: KeyboardToolbarState
+  @Environment(\.colorScheme) private var colorScheme
 
   var body: some View {
     HStack(spacing: 6) {
@@ -62,6 +63,25 @@ struct KeyboardToolbarView: View {
           )
         }
       }
+    }
+    .padding(.horizontal, 6)
+    .padding(.vertical, 2)
+    .background {
+      RoundedRectangle(cornerRadius: 13, style: .continuous)
+        .fill(.ultraThinMaterial)
+        .overlay {
+          RoundedRectangle(cornerRadius: 13, style: .continuous)
+            .strokeBorder(
+              Color.white.opacity(colorScheme == .dark ? 0.14 : 0.28),
+              lineWidth: 0.5
+            )
+        }
+        .shadow(
+          color: Color.black.opacity(colorScheme == .dark ? 0.18 : 0.05),
+          radius: 3,
+          x: 0,
+          y: 1
+        )
     }
     .padding(.horizontal, 4)
     .frame(height: 40)

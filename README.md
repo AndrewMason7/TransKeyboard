@@ -1,135 +1,157 @@
-# Gemini Voice Keyboard for iOS
+# TransKeyboard — Gemini Voice Keyboard for iOS
 
-An end-to-end iOS sample for Gemini 3.5 Live transcription and spoken translation from a custom keyboard. Tap **Dictate** or **Translate**, speak, tap again, and the result is inserted into the active text field.
+An end-to-end iOS application and custom keyboard featuring cloud-powered streaming speech transcription & translation via **Google Gemini 3.5 Live**, 100% offline on-device speech-to-text via Apple's neural **`SFSpeechRecognizer`**, and optional local on-device intelligence powered by **Gemma 4 LiteRT-LM**.
 
-> [!IMPORTANT]
-> This is a personal developer sample, not a production SDK or an App Store-ready app. Its Debug-only cold handoff uses private iOS behavior for a smoother personal-device demo. Release compiles that behavior out.
+Tap **Dictate** or **Translate** directly on the custom keyboard, speak, tap again, and the polished text is inserted directly into the active text field.
 
-## What it demonstrates
+---
 
-- `gemini-3.5-transcribe-live` streaming microphone audio and returning live text.
-- `gemini-3.5-live-translate-preview` translating speech while it is spoken.
-- A custom keyboard controlling microphone capture in its containing app through an App Group. Keyboard extensions cannot access the microphone themselves.
-- Safe Finish, Cancel, fallback, recovery, and insertion into the original text field.
-- A project-local typing surface adapted from KeyboardKit, with no runtime library dependency.
+## Key Highlights & Capabilities
 
-## Fork Enhancements & Modernization
+### 🎙️ Multi-Engine Speech Architecture
+Choose your speech transcription and translation pipeline in **Settings**:
 
-This fork upgrades the sample to modern iOS standards with a redesigned voice toolbar and Apple-matching typing surface:
+| Engine Mode | Primary Transcriber | Post-Processing & Translation | Network Requirement |
+| :--- | :--- | :--- | :--- |
+| **Gemini Live (Cloud)** | `gemini-3.5-transcribe-live` | `gemini-3.5-live-translate-preview` | Internet Required |
+| **Local On-Device** | Apple Neural Speech (`SFSpeechRecognizer`) | On-device Gemma 4 or smart heuristic punctuation | **100% Offline (Zero Data Sent)** |
+| **Gemini Live with Fallback** | `gemini-3.5-transcribe-live` | Auto-falls back to On-Device Speech when offline | Resilient to Network Dropouts |
 
-- **Native Apple Keyboard Geometry**: Compact keyboard height and tightened bottom padding so the bottom row keys (`123`, `space`, `.`, `return/search`) align cleanly right above the system globe and dictation microphone area.
-- **Refined Keycap Aesthetics**: Dark theme `#424242` background, 8.5 pt rounded keycaps, zero borderlines, zero 3D shadows, and crisp high-contrast white glyphs.
-- **Zero-Latency Typing**: Instantaneous case switching without crossfade lag, full multi-touch rollover, and touch-slop gesture handling to eliminate dropped keystrokes during rapid typing.
-- **SwiftUI Voice Toolbar**: Floating voice control bar with reactive status pill, live audio waveform levels, tactile haptics, and accessible touch targets.
-- **Hardened Architecture**: Full Swift 6 concurrency compliance, MainActor-isolated relay timer fixes, and an extensive unit test suite (124 passing tests across app and keyboard extension).
-- **Offline Voice-to-Text & Optional Gemma**: Zero-download offline voice transcription powered by Apple's on-device `SFSpeechRecognizer`, paired with an optional on-demand local Gemma model for punctuation, formatting, and offline translation.
+- **Zero-Download Offline Transcription**: Works out of the box with 0 MB downloaded using Apple's on-device speech model.
+- **Optional Local Gemma 4 Model**: Download [Gemma 4 E2B LiteRT-LM](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) (`gemma-4-E2B-it.litert-lm`, ~2.5 GB) directly on-device from Settings for offline punctuation, formatting, and translation. Can be deleted at any time to reclaim storage.
 
-## Model routing & Speech Engines
+---
 
-The app supports multiple speech engine modes configured from the containing app settings:
+### 📱 Modern 3-Tab App Architecture
 
-| Engine Mode | Primary Transcriber | Post-Processing / Translation | Network Required |
-| --- | --- | --- | --- |
-| **Gemini Live (Cloud)** | `gemini-3.5-transcribe-live` | `gemini-3.5-live-translate-preview` | Yes |
-| **Local On-Device** | Apple On-Device Speech (`SFSpeechRecognizer`) | Local Gemma Model (if installed) or heuristic punctuation | **No (100% Offline)** |
-| **Gemini Live with Fallback** | `gemini-3.5-transcribe-live` | Auto-falls back to On-Device Speech when offline | Offline resilient |
+The containing application is built with a glassmorphic SwiftUI design system:
 
-### Optional Local Model Download
-- **Zero initial bundle overhead**: On-device speech recognition works out of the box with 0 MB downloaded.
-- **Optional Gemma 4 E2B Model**: Users can opt in from settings to download [Gemma 4 E2B LiteRT-LM](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) (`gemma-4-E2B-it.litert-lm`, ~2.5 GB) for intelligent on-device transcript polishing, punctuation, and offline translation. Models can be deleted anytime to reclaim storage.
+* **Studio**:
+  - Live microphone audio visualizer with reactive decibel waveform.
+  - Interactive Relay Controller card for toggling recording and testing microphone handoff.
+  - OCR Text Extraction card (via camera capture or photo library selection).
+  - Dictation Test Playground with rich typography and instant clear actions.
+* **History**:
+  - Searchable transcript archive with session timestamps and word counts.
+  - Inline audio playback for recorded sessions.
+  - Recovery cards for safely restoring interrupted or orphaned recordings.
+  - Native iOS Share Sheet export for transcripts.
+* **Settings**:
+  - Secure iOS Keychain storage for Gemini API keys (enter directly in-app, no config files required).
+  - Speech engine picker (Gemini Live vs. Local On-Device vs. Hybrid Fallback).
+  - Gemma 4 Model Manager: one-tap download with live progress, byte counters, and storage cleanup.
+  - Interactive Keyboard Setup Guide for enabling Full Access.
 
-## How it works
+---
+
+### ⌨️ Native Apple-Matching Keyboard Surface
+
+The custom keyboard typing surface adapts layout principles from KeyboardKit 9.9.1 with zero runtime binary dependencies:
+
+- **Apple Native Geometry**: Calibrated keycap height and bottom margin alignment right above the system home indicator and globe area.
+- **Dark Theme Aesthetics**: System `#424242` background, 8.5 pt rounded keycaps, crisp high-contrast glyphs, and zero borderlines.
+- **Zero-Latency Typing**: Instantaneous case transitions without crossfade delay, multi-touch rollover, and touch-slop gesture handling to eliminate dropped keystrokes.
+- **Floating Voice Toolbar**: Dedicated voice control bar featuring a reactive status pill, live audio metering, tactile haptic feedback, and accessible touch targets.
+
+---
+
+## How It Works
+
+iOS keyboard extensions cannot directly record audio due to sandbox security restrictions. TransKeyboard bridges this with an App Group relay coordinator:
 
 ```text
-Custom keyboard
-  │  start / finish / cancel + request ID
+Custom Keyboard Process
+  │  start / finish / cancel + UUID request ID
   ▼
-Locked App Group store
+Locked App Group Store (file-locked, monotonic sequence)
   │
   ▼
-Containing app microphone relay
-  ├─ PCM stream → Gemini Live
-  └─ protected WAV → fallback/retry only
+Containing App Relay Process
+  ├─ SFSpeechRecognizer (Offline) ──┐
+  ├─ PCM Stream → Gemini Live (WS) ─┼─► Formatted Result
+  └─ Gemma 4 / Local Text Processor ┘
   │
   ▼
-Matching App Group result
+Locked App Group Result (matching request + document anchor guard)
   │
   ▼
-UITextDocumentProxy.insertText
+UITextDocumentProxy.insertText (Active Text Field)
 ```
 
-The important code is intentionally easy to find:
+---
 
-| Area | Location |
-| --- | --- |
-| Live model setup, streaming, events, and finalization | [`App/Gemini/Live`](App/Gemini/Live) |
-| Batch fallback and OCR requests | [`App/Gemini/Batch`](App/Gemini/Batch) |
-| Microphone capture and PCM conversion | [`App/Audio`](App/Audio) |
-| App-side keyboard relay | [`App/Relay`](App/Relay) |
-| Keyboard controller and UI | [`KeyboardExtension`](KeyboardExtension) |
-| Cross-process request/result protocol | [`Shared/Relay`](Shared/Relay) |
+## Source Layout
 
-For the detailed state machine and safety invariants, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). For a file-by-file Gemini guide, see [`App/Gemini/README.md`](App/Gemini/README.md).
+| Area | Location | Description |
+| :--- | :--- | :--- |
+| **Studio Tab** | [`App/UI/Studio`](App/UI/Studio) | Waveform visualizer, relay card, OCR tool, and sandbox |
+| **History Tab** | [`App/UI/History`](App/UI/History) | Searchable transcript store, playback, and session recovery |
+| **Settings Tab** | [`App/UI/Settings`](App/UI/Settings) | Credentials, speech engine selection, and Gemma download manager |
+| **Local AI & Models** | [`App/LocalAI`](App/LocalAI) | On-device speech recognizer, text processor, and model manager |
+| **Gemini Live & Batch** | [`App/Gemini`](App/Gemini) | WebSocket transport, Live protocol, and batch fallbacks |
+| **Audio Capture** | [`App/Audio`](App/Audio) | `AVAudioEngine` capture, PCM conversion, and session management |
+| **Cross-Process Relay** | [`App/Relay`](App/Relay), [`Shared/Relay`](Shared/Relay) | Inter-process state machine, locking, and request routing |
+| **Keyboard Extension** | [`KeyboardExtension`](KeyboardExtension) | Keyboard view controller, voice toolbar, and keycap layout |
+| **Shared State & Models** | [`Shared`](Shared) | Speech engine modes, design theme, and shared data types |
 
-## Requirements
+---
 
-- Xcode 26.6 or later
-- iOS 26 or later
-- A physical iPhone
-- An Apple Developer team with three bundle identifiers and one shared App Group
-- A Gemini API key for personal development
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+## Getting Started
 
-## Run the sample
+### Prerequisites
+- macOS with **Xcode 26** or later (iOS 26+ SDK)
+- An Apple Silicon Mac (recommended)
+- iOS Simulator or a physical iPhone running iOS 26+
+- *(Optional)* A Google Gemini API key (for cloud streaming and translation)
+- *(Optional)* [XcodeGen](https://github.com/yonaskolb/XcodeGen) (if regenerating the `.xcodeproj`)
 
-1. Create the local configuration:
+### 1. Build and Run Immediately
+The project is pre-configured with ad-hoc signing for simulators. You do **not** need a paid Apple Developer account to build and run the sample:
 
-   ```sh
-   cp Config/Secrets.xcconfig.example Config/Secrets.xcconfig
-   ```
+Open `GeminiVoiceKeyboard.xcodeproj` in Xcode, select the **GeminiVoice** scheme with an **iPhone 17** simulator, and press **Cmd + R**.
 
-2. Add your Apple team, unique bundle identifiers, App Group, and Gemini API key to `Config/Secrets.xcconfig`.
+### 2. Configure Your API Key
+You can configure your Gemini API key in two ways:
+- **Directly In-App (Recommended)**: Open the app on your device or simulator, navigate to **Settings → Gemini API Key**, and paste your key. It is saved directly to your device's secure iOS Keychain.
+- **Via Configuration File**: Copy the template and add your credentials:
+  ```sh
+  cp Config/Secrets.xcconfig.example Config/Secrets.xcconfig
+  ```
+  Edit `Config/Secrets.xcconfig` with your Apple Team ID, Bundle Identifiers, and `GEMINI_DEFAULT_API_KEY`.
 
-3. Register the same identifiers and App Group in your Apple Developer account, then generate the project:
+### 3. Run Automated Tests
+Execute the comprehensive test suite (185 unit and UI tests):
 
-   ```sh
-   xcodegen generate
-   ```
+```sh
+./Scripts/test.sh -u    # Run fast unit tests
+./Scripts/test.sh       # Run full suite (unit + UI tests)
+```
 
-4. Run the simulator test suite:
+### 4. Enable the Keyboard on Device
+1. On your iPhone, navigate to **Settings → General → Keyboard → Keyboards → Add New Keyboard…**
+2. Select **Gemini Voice**.
+3. Tap **Gemini Voice** and toggle **Allow Full Access** (required for App Group communication with the containing app).
+4. Open the **Gemini Voice** app once to grant microphone permissions.
+5. In any text field, switch to Gemini Voice and tap **Dictate**!
 
-   ```sh
-   ./Scripts/test.sh      # Full suite (unit + UI tests)
-   ./Scripts/test.sh -u   # Fast unit tests only (~5s)
-   ```
+---
 
+## Behavior & Architecture Notes
 
-5. Deploy to a paired iPhone:
+- **Warm Relay**: The containing app keeps its audio session armed briefly in the background, allowing the keyboard to start dictation immediately without app switching.
+- **Cold Relay Handoff**: If the containing app is terminated, the keyboard prompts a quick tap to open the app, automatically arming the microphone and returning focus.
+- **Finish vs. Cancel**: *Finish* drains all buffered speech and delivers the final formatted result. *Cancel* immediately aborts processing, deletes temporary recordings, and leaves the text field untouched.
+- **Insertion Safety**: Results are only inserted into the active text field if the request ID and text document context still match when transcription completes, preventing stray insertions.
 
-   ```sh
-   xcrun devicectl list devices
-   ./Scripts/deploy-device.sh <device-identifier>
-   ```
+---
 
-6. On the iPhone, add **Gemini Voice** under **Settings → General → Keyboard → Keyboards**, enable **Allow Full Access**, open the containing app once, and grant microphone access.
+## Legal & Third-Party Notices
 
-7. In any normal text field, select the keyboard and try **Dictate** or **Translate**. Tap the active button again to Finish; use **X** to discard.
+This project is licensed under the [Apache License 2.0](LICENSE).
 
-## Behavior worth knowing
+Third-party dependencies, model weights, and APIs are used under their respective licenses:
+- **KeyboardKit 9.9.1**: Copyright (c) 2016-2025 Daniel Saidi ([MIT License](THIRD_PARTY_NOTICES.md#1-keyboardkit-991)).
+- **Gemma 4 LiteRT-LM**: Copyright (c) Google LLC ([Apache 2.0 License](THIRD_PARTY_NOTICES.md#2-google-gemma-4-litert-lm-model)), subject to the [Google Gemma Additional Terms of Use](https://ai.google.dev/gemma/terms) and [Gemma Prohibited Use Policy](https://ai.google.dev/gemma/prohibited_use_policy). Model weights are downloaded on-demand and are not bundled in this repository.
+- **Google Gemini API**: Governed by the [Google APIs Terms of Service](https://developers.google.com/terms) and [Gemini API Terms](https://ai.google.dev/gemini-api/terms).
 
-- **Warm relay is the intended path.** The containing app keeps its microphone session armed briefly in the background, so the keyboard can start immediately without leaving the text field.
-- **Cold relay needs a handoff.** Release asks the user to return manually. The personal Debug build contains an unsupported automatic-return experiment.
-- **Finish is not Cancel.** Finish drains accepted audio and waits for the authoritative final result. Cancel remains available while recording or processing; it stops the work, deletes the temporary recording, and inserts nothing.
-- **Long recordings auto-finish at five minutes.** This bounds background and fallback resource use without interrupting normal dictation-length speech.
-- **Fallback is explicit.** A complete local WAV is used only when Live fails after Finish. Failed recordings remain available for a user-initiated retry.
-- **Insertion is guarded.** A result is inserted automatically only when its request and document anchor still match; otherwise the keyboard offers **Insert latest**.
-
-## Security boundary
-
-`Config/Secrets.xcconfig` is ignored by Git, but a Debug key compiled into an app is still extractable. Use a restricted development key with billing limits.
-
-Production software should keep long-lived keys on a backend, proxy batch requests, and issue constrained [ephemeral tokens](https://ai.google.dev/gemini-api/docs/live-api/ephemeral-tokens) for direct Live connections. Review the included privacy manifests and make your own privacy disclosures.
-
-## License
-
-Licensed under the [Apache License 2.0](LICENSE). Third-party software, model, and service attributions (KeyboardKit, Gemma 4 LiteRT, Gemini API) are documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for full notices and trademark disclaimers.

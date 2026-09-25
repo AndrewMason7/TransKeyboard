@@ -47,6 +47,122 @@ extension RelayController {
     guard status != .transcribing, activeRequestID == nil else { return }
     markRelayActivityAndSuspendIdleShutdown()
 
+    if configuration.speechEngineMode == .localOnDevice {
+      isUsingLocalTranscriber = true
+      let chunkHandler: @Sendable (Data) -> Void = { [weak self] data in
+        Task { @MainActor [weak self] in
+          self?.localTranscriber.appendAudioData(data)
+        }
+      }
+      do {
+        let startedAt = Date()
+        try capture.beginSegment(
+          requestID: requestID,
+          action: action,
+          translationTargetCode: configuration.translationTarget.code,
+          at: startedAt,
+          audioChunkHandler: chunkHandler,
+          audioStreamingFailureHandler: { _ in }
+        )
+        activeRequestID = requestID
+        activeDictationAction = action
+        activeStartedAt = startedAt
+        let listeningMessage = action == .translate
+          ? "Translating on-device… tap again when finished"
+          : "Transcribing on-device… tap the microphone again when finished"
+        publish(
+          .recording,
+          message: listeningMessage,
+          activeRequestID: requestID,
+          activeDictationAction: action,
+          recordingStartedAt: startedAt
+        )
+        try localTranscriber.start(
+          progressHandler: { [weak self] text in
+            Task { @MainActor [weak self] in
+              self?.publishLivePreview(text, requestID: requestID, action: action)
+            }
+          },
+          completionHandler: { [weak self] result in
+            Task { @MainActor [weak self] in
+              self?.handleLocalTranscriptionResult(result, requestID: requestID, action: action)
+            }
+          }
+        )
+        let workItem = DispatchWorkItem { [weak self] in
+          Task { @MainActor [weak self] in
+            guard let self, self.activeRequestID == requestID else { return }
+            self.finishDictationAndTranscribe(requestID: requestID)
+          }
+        }
+        maximumDurationWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+          deadline: .now() + Self.maximumDictationDuration,
+          execute: workItem
+        )
+        return
+      } catch {
+        cancelAutomaticReturnToKeyboard()
+        publish(
+          .error,
+          message: error.localizedDescription,
+          activeRequestID: requestID,
+          activeDictationAction: action
+        )
+        markRelayActivityAndScheduleIdleShutdown()
+        return
+      }
+    }
+
+    if configuration.speechEngineMode == .geminiBatch {
+      do {
+        let startedAt = Date()
+        try capture.beginSegment(
+          requestID: requestID,
+          action: action,
+          translationTargetCode: configuration.translationTarget.code,
+          at: startedAt,
+          audioChunkHandler: { _ in },
+          audioStreamingFailureHandler: { _ in }
+        )
+        activeRequestID = requestID
+        activeDictationAction = action
+        activeStartedAt = startedAt
+        let listeningMessage = action == .translate
+          ? "Recording for Gemini translation… tap again when finished"
+          : "Recording for Gemini 3.5 Transcribe… tap again when finished"
+        publish(
+          .recording,
+          message: listeningMessage,
+          activeRequestID: requestID,
+          activeDictationAction: action,
+          recordingStartedAt: startedAt
+        )
+        let workItem = DispatchWorkItem { [weak self] in
+          Task { @MainActor [weak self] in
+            guard let self, self.activeRequestID == requestID else { return }
+            self.finishDictationAndTranscribe(requestID: requestID)
+          }
+        }
+        maximumDurationWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+          deadline: .now() + Self.maximumDictationDuration,
+          execute: workItem
+        )
+        return
+      } catch {
+        cancelAutomaticReturnToKeyboard()
+        publish(
+          .error,
+          message: error.localizedDescription,
+          activeRequestID: requestID,
+          activeDictationAction: action
+        )
+        markRelayActivityAndScheduleIdleShutdown()
+        return
+      }
+    }
+
     let translationTarget = configuration.translationTarget
     let mode = GeminiLiveSpeechSession.mode(
       for: action,
@@ -54,6 +170,7 @@ extension RelayController {
     )
     let liveSession = GeminiLiveSpeechSession(
       mode: mode,
+      model: configuration.liveTranscriptionModel,
       progressHandler: { [weak self] text in
         Task { @MainActor [weak self] in
           self?.publishLivePreview(

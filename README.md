@@ -4,6 +4,11 @@ An end-to-end iOS application and custom keyboard featuring cloud-powered stream
 
 Tap **Dictate** or **Translate** directly on the custom keyboard, speak, tap again, and the polished text is inserted directly into the active text field.
 
+<div align="center">
+  <img src="docs/assets/demo.gif" alt="TransKeyboard Voice Dictation Demo" width="380" style="border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.3);">
+  <p><em>Real-time voice dictation with on-device Gemma model transcription & Apple-matching keycaps</em></p>
+</div>
+
 ---
 
 ## Key Highlights & Capabilities

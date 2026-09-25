@@ -32,3 +32,6 @@ SourcePackages/
 .agents/
 *.jpeg
 *.jpg
+*.mov
+*.mp4
+*.m4v

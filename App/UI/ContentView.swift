@@ -1,45 +1,63 @@
+import PhotosUI
 import SwiftUI
 import UIKit
 
-struct ContentView: View {
-  @Environment(\.openURL) var openURL
-  @ObservedObject var configuration: AppConfiguration
-  @ObservedObject var relay: RelayController
+public enum AppTab: String, CaseIterable, Identifiable {
+  case studio
+  case history
+  case settings
 
-  @State var settingsExpanded = false
-  @State var recordingPendingDeletion: RecoverableRecording?
+  public var id: String { rawValue }
+}
+
+struct ContentView: View {
+  @Bindable var configuration: AppConfiguration
+  @Bindable var relay: RelayController
+
+  @State private var selectedTab: AppTab = .studio
+  @State private var recordingPendingDeletion: RecoverableRecording?
+  @State private var selectedPhotoItem: PhotosPickerItem?
 
   var body: some View {
-    ZStack {
-      LinearGradient(
-        colors: [
-          Color(red: 0.035, green: 0.05, blue: 0.10), Color(red: 0.08, green: 0.055, blue: 0.16),
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-      )
-      .ignoresSafeArea()
-
-      ScrollView {
-        VStack(spacing: 18) {
-          header
-          relayCard
-          ocrCard
-          setupCard
-          settingsCard
-          savedRecordingsCard
-          recentCard
-          privacyFooter
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, 18)
-        .padding(.bottom, 36)
+    TabView(selection: $selectedTab) {
+      NavigationStack {
+        StudioView(
+          configuration: configuration,
+          relay: relay,
+          selectedPhotoItem: $selectedPhotoItem
+        )
       }
+      .tabItem {
+        Label("Studio", systemImage: "waveform.circle.fill")
+      }
+      .tag(AppTab.studio)
+
+      NavigationStack {
+        HistoryView(
+          relay: relay,
+          recordingPendingDeletion: $recordingPendingDeletion
+        )
+      }
+      .tabItem {
+        Label("History", systemImage: "clock.arrow.circlepath")
+      }
+      .tag(AppTab.history)
+
+      NavigationStack {
+        SettingsView(
+          configuration: configuration,
+          relay: relay
+        )
+      }
+      .tabItem {
+        Label("Settings", systemImage: "gearshape.fill")
+      }
+      .tag(AppTab.settings)
     }
-    .preferredColorScheme(.dark)
+    .tint(GeminiVoiceTheme.accentColor)
     .overlay {
       if relay.isKeyboardHandoffActive {
-        keyboardHandoffOverlay
+        KeyboardHandoffOverlay(relay: relay)
       }
     }
     .onOpenURL(perform: relay.handleDeepLink)
@@ -71,6 +89,15 @@ struct ContentView: View {
       Button("Keep Recording", role: .cancel) {}
     } message: { _ in
       Text("This permanently removes the local audio clip.")
+    }
+    // FIX #7 (per Tyler & Maya): Structured task modifier scoped to photo selection lifecycle
+    .task(id: selectedPhotoItem) {
+      guard let selectedPhotoItem else { return }
+      defer { self.selectedPhotoItem = nil }
+      if let data = try? await selectedPhotoItem.loadTransferable(type: Data.self),
+         let image = UIImage(data: data) {
+        relay.imagePickerDidSelect(image)
+      }
     }
   }
 }

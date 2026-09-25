@@ -1,22 +1,29 @@
 import XCTest
 
+@MainActor
 final class GeminiVoiceUITests: XCTestCase {
   func testLaunchShowsRelayAndSetupInstructions() {
     let app = XCUIApplication()
     app.launchEnvironment["GEMINI_VOICE_DISABLE_RELAY_AUTOSTART"] = "1"
     app.launch()
 
+    // Studio Tab Verification
     XCTAssertTrue(app.staticTexts["Gemini Voice"].waitForExistence(timeout: 5))
     XCTAssertTrue(app.buttons["relay-control-button"].exists)
     XCTAssertTrue(app.buttons["camera-ocr-button"].exists)
-    XCTAssertTrue(app.staticTexts["One-time setup"].exists)
 
-    let settings = app.buttons["Gemini settings"]
-    if !settings.isHittable {
-      app.swipeUp()
+    // Navigate to Settings Tab
+    let settingsTab = app.tabBars.buttons["Settings"]
+    if settingsTab.waitForExistence(timeout: 3) {
+      settingsTab.tap()
+    } else {
+      let settingsButton = app.buttons["Settings"]
+      XCTAssertTrue(settingsButton.waitForExistence(timeout: 2))
+      settingsButton.tap()
     }
-    XCTAssertTrue(settings.waitForExistence(timeout: 2))
-    settings.tap()
+
+    // Settings Tab Verification
+    XCTAssertTrue(app.staticTexts["One-time setup"].waitForExistence(timeout: 3))
 
     let activeModel = app.descendants(matching: .any)["active-transcription-model"]
     XCTAssertTrue(reveal(activeModel, in: app))

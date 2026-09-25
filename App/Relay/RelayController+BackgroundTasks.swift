@@ -29,13 +29,20 @@ extension RelayController {
 
   func beginTranscriptionBackgroundTaskIfNeeded() {
     guard transcriptionBackgroundTaskIdentifier == .invalid else { return }
-    transcriptionBackgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask(
+    var taskID = UIBackgroundTaskIdentifier.invalid
+    taskID = UIApplication.shared.beginBackgroundTask(
       withName: "Finish Gemini transcription"
     ) { [weak self] in
+      if taskID != .invalid {
+        UIApplication.shared.endBackgroundTask(taskID)
+        taskID = .invalid
+      }
       Task { @MainActor [weak self] in
+        self?.transcriptionBackgroundTaskIdentifier = .invalid
         self?.transcriptionBackgroundTimeExpired()
       }
     }
+    transcriptionBackgroundTaskIdentifier = taskID
   }
 
   func transcriptionBackgroundTimeExpired() {
@@ -65,13 +72,20 @@ extension RelayController {
 
   func beginOCRBackgroundTaskIfNeeded() {
     guard ocrBackgroundTaskIdentifier == .invalid else { return }
-    ocrBackgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask(
+    var taskID = UIBackgroundTaskIdentifier.invalid
+    taskID = UIApplication.shared.beginBackgroundTask(
       withName: "Finish Gemini OCR"
     ) { [weak self] in
+      if taskID != .invalid {
+        UIApplication.shared.endBackgroundTask(taskID)
+        taskID = .invalid
+      }
       Task { @MainActor [weak self] in
+        self?.ocrBackgroundTaskIdentifier = .invalid
         self?.endOCRBackgroundTaskIfNeeded()
       }
     }
+    ocrBackgroundTaskIdentifier = taskID
   }
 
   func endOCRBackgroundTaskIfNeeded() {

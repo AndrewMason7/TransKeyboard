@@ -76,7 +76,7 @@ extension AudioCaptureEngine {
       throw AudioCaptureError.invalidInputFormat
     }
 
-    input.installTap(onBus: 0, bufferSize: 2_048, format: format) { [weak self] buffer, _ in
+    try input.installTap(onBus: 0, bufferSize: 2_048, format: format) { [weak self] buffer, _ in
       self?.write(buffer)
     }
     tapInstalled = true
@@ -99,34 +99,31 @@ extension AudioCaptureEngine {
       false,
       options: [.notifyOthersOnDeactivation]
     )
-    fileLock.lock()
-    inputFormat = nil
-    streamingConverter = nil
-    streamingOutputFormat = nil
-    streamingChunker.reset()
-    audioChunkHandler = nil
-    audioStreamingFailureHandler = nil
-    didReportStreamingFailure = false
-    fileLock.unlock()
+    performOnAudioProcessingQueue {
+      isRecordingActive = false
+      fileLock.lock()
+      inputFormat = nil
+      streamingConverter = nil
+      streamingOutputFormat = nil
+      streamingChunker.reset()
+      audioChunkHandler = nil
+      audioStreamingFailureHandler = nil
+      didReportStreamingFailure = false
+      fileLock.unlock()
+    }
     isRunning = false
     activeConfigurationName = ""
   }
 
-  func handleInterruption(_ notification: Notification) {
-    guard shouldBeRunning,
-      let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
-      let type = AVAudioSession.InterruptionType(rawValue: rawType)
-    else { return }
+  func handleSessionDidBecomeInactive(_ notification: Notification) {
+    guard shouldBeRunning else { return }
+    NSLog("AUDIO_RELAY_INTERRUPTED route=%@", routeDescription)
+    isRunning = false
+  }
 
-    switch type {
-    case .began:
-      NSLog("AUDIO_RELAY_INTERRUPTED route=%@", routeDescription)
-      isRunning = false
-    case .ended:
-      scheduleRecovery(reason: "audio interruption ended")
-    @unknown default:
-      break
-    }
+  func handleResumptionRecommendation(_ notification: Notification) {
+    guard shouldBeRunning else { return }
+    scheduleRecovery(reason: "audio interruption ended")
   }
 
   func scheduleRecovery(reason: String) {

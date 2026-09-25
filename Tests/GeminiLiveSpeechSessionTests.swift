@@ -140,6 +140,13 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
     XCTAssertEqual(detection["disabled"] as? Bool, true)
   }
 
+  func testTranscriptionSetupUsesConfiguredCustomLiveModel() throws {
+    let customModel = "gemini-3.1-flash-live-preview"
+    let message = GeminiLiveSpeechSession.setupMessage(for: .transcribe, model: customModel)
+    let setup = try XCTUnwrap(message["setup"] as? [String: Any])
+    XCTAssertEqual(setup["model"] as? String, "models/\(customModel)")
+  }
+
   func testTranslationTranscriptTogglesAreSetupFieldsNotGenerationConfigFields() throws {
     // Verified against the live endpoint: transcription toggles nested in
     // generationConfig are rejected with close code 1007 before

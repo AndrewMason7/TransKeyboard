@@ -26,12 +26,13 @@ extension GeminiLiveSpeechSession {
     return GeminiLiveEndpoint(url: url, headers: headers)
   }
 
-  static func setupMessage(for mode: Mode) -> [String: Any] {
+  static func setupMessage(for mode: Mode, model: String? = nil) -> [String: Any] {
     switch mode {
     case .transcribe:
+      let activeModel = model ?? defaultTranscriptionModel
       return [
         "setup": [
-          "model": "models/\(transcriptionModel)",
+          "model": "models/\(activeModel)",
           "generationConfig": [
             "responseModalities": ["TEXT"]
           ],

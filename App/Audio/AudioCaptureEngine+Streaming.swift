@@ -25,22 +25,89 @@ private final class AudioConverterInputProvider: @unchecked Sendable {
   }
 }
 
+extension AVAudioPCMBuffer {
+  func copyBuffer() -> AVAudioPCMBuffer? {
+    guard frameLength > 0,
+      let copy = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameLength)
+    else {
+      return nil
+    }
+    copy.frameLength = frameLength
+    let channels = Int(format.channelCount)
+    let frames = Int(frameLength)
+    let isInterleaved = format.isInterleaved
+
+    if let src = floatChannelData, let dst = copy.floatChannelData {
+      if isInterleaved {
+        memcpy(dst[0], src[0], frames * channels * MemoryLayout<Float>.size)
+      } else {
+        for channel in 0..<channels {
+          memcpy(dst[channel], src[channel], frames * MemoryLayout<Float>.size)
+        }
+      }
+      return copy
+    }
+    if let src = int16ChannelData, let dst = copy.int16ChannelData {
+      if isInterleaved {
+        memcpy(dst[0], src[0], frames * channels * MemoryLayout<Int16>.size)
+      } else {
+        for channel in 0..<channels {
+          memcpy(dst[channel], src[channel], frames * MemoryLayout<Int16>.size)
+        }
+      }
+      return copy
+    }
+    if let src = int32ChannelData, let dst = copy.int32ChannelData {
+      if isInterleaved {
+        memcpy(dst[0], src[0], frames * channels * MemoryLayout<Int32>.size)
+      } else {
+        for channel in 0..<channels {
+          memcpy(dst[channel], src[channel], frames * MemoryLayout<Int32>.size)
+        }
+      }
+      return copy
+    }
+    let srcBuffers = UnsafeMutableAudioBufferListPointer(self.mutableAudioBufferList)
+    let dstBuffers = UnsafeMutableAudioBufferListPointer(copy.mutableAudioBufferList)
+    for (src, dst) in zip(srcBuffers, dstBuffers) {
+      if let srcData = src.mData, let dstData = dst.mData {
+        memcpy(dstData, srcData, min(Int(src.mDataByteSize), Int(dst.mDataByteSize)))
+      }
+    }
+    return copy
+  }
+}
+
 extension AudioCaptureEngine {
   func write(_ buffer: AVAudioPCMBuffer) {
+    guard buffer.frameLength > 0 else { return }
+
+    var levelToPublish: Double?
+    let now = ProcessInfo.processInfo.systemUptime
+    if now - lastLevelPublishedAt >= 0.05 {
+      lastLevelPublishedAt = now
+      levelToPublish = normalizedLevel(in: buffer)
+    }
+
+    if let levelToPublish {
+      levelHandler?(levelToPublish)
+    }
+
+    guard isRecordingActive, let bufferCopy = buffer.copyBuffer() else { return }
+    audioProcessingQueue.async { [weak self] in
+      self?.processAudioBuffer(bufferCopy)
+    }
+  }
+
+  func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
     fileLock.lock()
     guard let activeFile else {
       fileLock.unlock()
       return
     }
 
-    var levelToPublish: Double?
     var streamingChunks: [Data] = []
     let chunkHandler = audioChunkHandler
-    let now = ProcessInfo.processInfo.systemUptime
-    if now - lastLevelPublishedAt >= 0.18 {
-      lastLevelPublishedAt = now
-      levelToPublish = normalizedLevel(in: buffer)
-    }
 
     if writeFailure == nil {
       do {
@@ -60,10 +127,6 @@ extension AudioCaptureEngine {
       streamingChunks.forEach(chunkHandler)
     }
     fileLock.unlock()
-
-    if let levelToPublish {
-      levelHandler?(levelToPublish)
-    }
   }
 
   func configureStreamingConverter(from inputFormat: AVAudioFormat) {
@@ -123,8 +186,9 @@ extension AudioCaptureEngine {
     else { return nil }
 
     let audioBuffer = outputBuffer.audioBufferList.pointee.mBuffers
-    guard let bytes = audioBuffer.mData, audioBuffer.mDataByteSize > 0 else { return nil }
-    return Data(bytes: bytes, count: Int(audioBuffer.mDataByteSize))
+    let validBytes = Int(outputBuffer.frameLength) * MemoryLayout<Int16>.size
+    guard let bytes = audioBuffer.mData, validBytes > 0 else { return nil }
+    return Data(bytes: bytes, count: validBytes)
   }
 
   func finishStreamingPCMData() -> [Data] {
@@ -161,8 +225,9 @@ extension AudioCaptureEngine {
 
       if outputBuffer.frameLength > 0 {
         let audioBuffer = outputBuffer.audioBufferList.pointee.mBuffers
-        if let bytes = audioBuffer.mData, audioBuffer.mDataByteSize > 0 {
-          output.append(Data(bytes: bytes, count: Int(audioBuffer.mDataByteSize)))
+        let validBytes = Int(outputBuffer.frameLength) * MemoryLayout<Int16>.size
+        if let bytes = audioBuffer.mData, validBytes > 0 {
+          output.append(Data(bytes: bytes, count: validBytes))
         }
       }
       if status == .endOfStream || outputBuffer.frameLength == 0 { break }
@@ -212,6 +277,7 @@ extension AudioCaptureEngine {
 
     let rootMeanSquare = sqrt(sumOfSquares / Double(frameCount))
     let decibels = 20 * log10(max(rootMeanSquare, 0.000_001))
-    return min(max((decibels + 52) / 52, 0), 1)
+    let linear = min(max((decibels + 48) / 42, 0), 1)
+    return pow(linear, 0.70)
   }
 }

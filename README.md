@@ -21,21 +21,22 @@ This fork upgrades the sample to modern iOS standards with a redesigned voice to
 - **Refined Keycap Aesthetics**: Dark theme `#424242` background, 8.5 pt rounded keycaps, zero borderlines, zero 3D shadows, and crisp high-contrast white glyphs.
 - **Zero-Latency Typing**: Instantaneous case switching without crossfade lag, full multi-touch rollover, and touch-slop gesture handling to eliminate dropped keystrokes during rapid typing.
 - **SwiftUI Voice Toolbar**: Floating voice control bar with reactive status pill, live audio waveform levels, tactile haptics, and accessible touch targets.
-- **Hardened Architecture**: Full Swift 6 concurrency compliance, MainActor-isolated relay timer fixes, and an extensive unit test suite (103 passing tests across app and keyboard extension).
+- **Hardened Architecture**: Full Swift 6 concurrency compliance, MainActor-isolated relay timer fixes, and an extensive unit test suite (124 passing tests across app and keyboard extension).
+- **Offline Voice-to-Text & Optional Gemma**: Zero-download offline voice transcription powered by Apple's on-device `SFSpeechRecognizer`, paired with an optional on-demand local Gemma model for punctuation, formatting, and offline translation.
 
-## Model routing
+## Model routing & Speech Engines
 
-The keyboard voice buttons always start a Gemini Live session. There is no batch-mode toggle.
+The app supports multiple speech engine modes configured from the containing app settings:
 
-| Action | Primary model | Fallback |
-| --- | --- | --- |
-| **Dictate** | `gemini-3.5-transcribe-live` | `gemini-3.5-transcribe` after a Live failure |
-| **Translate** | `gemini-3.5-live-translate-preview` | `gemini-3.5-transcribe` + `gemini-3.5-flash` after a Live failure |
-| **Camera OCR** | `gemini-3.8-flash` | None |
+| Engine Mode | Primary Transcriber | Post-Processing / Translation | Network Required |
+| --- | --- | --- | --- |
+| **Gemini Live (Cloud)** | `gemini-3.5-transcribe-live` | `gemini-3.5-live-translate-preview` | Yes |
+| **Local On-Device** | Apple On-Device Speech (`SFSpeechRecognizer`) | Local Gemma Model (if installed) or heuristic punctuation | **No (100% Offline)** |
+| **Gemini Live with Fallback** | `gemini-3.5-transcribe-live` | Auto-falls back to On-Device Speech when offline | Offline resilient |
 
-The Flash models are never used for a normal keyboard voice request. They are limited to OCR and the emergency text-only translation step after Live has failed.
-
-Model IDs and preview APIs change. Verify them against Google's [Live transcription](https://ai.google.dev/gemini-api/docs/live-api/live-transcribe), [Live translation](https://ai.google.dev/gemini-api/docs/live-api/live-translate), and [Gemini 3.8 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash) documentation before adopting the sample.
+### Optional Local Model Download
+- **Zero initial bundle overhead**: On-device speech recognition works out of the box with 0 MB downloaded.
+- **Optional Gemma 4 E2B Model**: Users can opt in from settings to download [Gemma 4 E2B LiteRT-LM](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) (`gemma-4-E2B-it.litert-lm`, ~2.5 GB) for intelligent on-device transcript polishing, punctuation, and offline translation. Models can be deleted anytime to reclaim storage.
 
 ## How it works
 
@@ -131,4 +132,4 @@ Production software should keep long-lived keys on a backend, proxy batch reques
 
 ## License
 
-Licensed under the [Apache License 2.0](LICENSE). The local typing surface includes MIT-licensed KeyboardKit adaptations documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+Licensed under the [Apache License 2.0](LICENSE). Third-party software, model, and service attributions (KeyboardKit, Gemma 4 LiteRT, Gemini API) are documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

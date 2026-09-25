@@ -165,20 +165,28 @@ final class RelayProtocolTests: XCTestCase {
 
   func testConcurrentCommandIssuanceProducesUniqueSequences() {
     let issueCount = 40
-    let resultLock = NSLock()
-    var sequences: [Int] = []
+    final class SequenceCollector: @unchecked Sendable {
+      private let lock = NSLock()
+      var values: [Int] = []
+      func append(_ value: Int) {
+        lock.lock()
+        values.append(value)
+        lock.unlock()
+      }
+    }
+    let collector = SequenceCollector()
 
+    let store = self.store!
     DispatchQueue.concurrentPerform(iterations: issueCount) { index in
       let sequence = store.issue(
         .start,
         requestID: "request-\(index)",
         dictationAction: .transcribe
       )
-      resultLock.lock()
-      sequences.append(sequence)
-      resultLock.unlock()
+      collector.append(sequence)
     }
 
+    let sequences = collector.values
     XCTAssertEqual(Set(sequences).count, issueCount)
     XCTAssertEqual(sequences.min(), 1)
     XCTAssertEqual(sequences.max(), issueCount)
@@ -238,15 +246,43 @@ final class RelayProtocolTests: XCTestCase {
   }
 
   #if GEMINI_PERSONAL_DEVICE
-    func testPersonalDeviceMessagesFallbackRequiresExactProcessName() {
+    func testPersonalDeviceHostFallbackResolvesKnownApps() {
       XCTAssertEqual(
         PersonalDeviceHostFallback.destination(
           resolvedBundleIdentifier: nil,
           hostProcessName: "MobileSMS"
         ),
-        PersonalDeviceHostFallback.messagesBundleIdentifier
+        "com.apple.MobileSMS"
       )
-      for untrustedProcessName in [nil, "", "Messages", "MobileSafari", "MobileSMSHelper"] {
+      XCTAssertEqual(
+        PersonalDeviceHostFallback.destination(
+          resolvedBundleIdentifier: nil,
+          hostProcessName: "MobileNotes"
+        ),
+        "com.apple.mobilenotes"
+      )
+      XCTAssertEqual(
+        PersonalDeviceHostFallback.destination(
+          resolvedBundleIdentifier: nil,
+          hostProcessName: "MobileSafari"
+        ),
+        "com.apple.mobilesafari"
+      )
+      XCTAssertEqual(
+        PersonalDeviceHostFallback.destination(
+          resolvedBundleIdentifier: nil,
+          hostProcessName: "MobileMail"
+        ),
+        "com.apple.mobilemail"
+      )
+      XCTAssertEqual(
+        PersonalDeviceHostFallback.destination(
+          resolvedBundleIdentifier: nil,
+          hostProcessName: "Reminders"
+        ),
+        "com.apple.reminders"
+      )
+      for untrustedProcessName in [nil, "", "Messages", "MobileSMSHelper", "RandomApp"] {
         XCTAssertNil(
           PersonalDeviceHostFallback.destination(
             resolvedBundleIdentifier: nil,
@@ -254,10 +290,28 @@ final class RelayProtocolTests: XCTestCase {
           )
         )
       }
-      XCTAssertTrue(
-        RelayLaunchRequest.isValidBundleIdentifier(
-          PersonalDeviceHostFallback.messagesBundleIdentifier
-        )
+    }
+
+    func testPersonalDeviceHostFallbackProvidesReturnURLs() {
+      XCTAssertEqual(
+        PersonalDeviceHostFallback.returnURL(forBundleIdentifier: "com.apple.MobileSMS"),
+        URL(string: "sms:")
+      )
+      XCTAssertEqual(
+        PersonalDeviceHostFallback.returnURL(forBundleIdentifier: "com.apple.mobilenotes"),
+        URL(string: "mobilenotes://")
+      )
+      XCTAssertEqual(
+        PersonalDeviceHostFallback.returnURL(forBundleIdentifier: "com.apple.mobilesafari"),
+        URL(string: "x-web-search://")
+      )
+      XCTAssertEqual(
+        PersonalDeviceHostFallback.displayName(forBundleIdentifier: "com.apple.mobilenotes"),
+        "Notes"
+      )
+      XCTAssertEqual(
+        PersonalDeviceHostFallback.displayName(forBundleIdentifier: "com.apple.MobileSMS"),
+        "Messages"
       )
     }
 

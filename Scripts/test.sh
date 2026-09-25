@@ -12,11 +12,7 @@ else
   echo "XcodeGen not found; using the committed Xcode project."
 fi
 
-device_id="$(xcrun simctl list devices available | sed -nE 's/^[[:space:]]*iPhone[^\(]*\(([A-F0-9-]+)\) \((Booted|Shutdown)\).*$/\1/p' | head -n 1)"
-if [[ -z "$device_id" ]]; then
-  echo "No available iPhone simulator was found."
-  exit 1
-fi
+destination="${TEST_DESTINATION:-platform=iOS Simulator,name=iPhone 17}"
 
 scheme="GeminiVoice"
 raw_output=0
@@ -43,7 +39,7 @@ cmd=(
   xcodebuild
   -project GeminiVoiceKeyboard.xcodeproj
   -scheme "$scheme"
-  -destination "platform=iOS Simulator,id=$device_id"
+  -destination "$destination"
   -derivedDataPath DerivedData
   -collect-test-diagnostics never
 )

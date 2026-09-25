@@ -41,4 +41,25 @@ final class TranscriptHistoryStoreTests: XCTestCase {
 
     XCTAssertTrue(TranscriptHistoryStore(directoryURL: directoryURL).items.isEmpty)
   }
+
+  func testRemoveSingleItemPersistsAcrossRelaunch() throws {
+    let store = TranscriptHistoryStore(directoryURL: directoryURL)
+    let item1 = try store.add(text: "Keep me", createdAt: Date(timeIntervalSince1970: 10))
+    let item2 = try store.add(text: "Delete me", createdAt: Date(timeIntervalSince1970: 20))
+
+    try store.remove(id: item2.id)
+
+    XCTAssertEqual(store.items, [item1])
+
+    let reloaded = TranscriptHistoryStore(directoryURL: directoryURL)
+    XCTAssertEqual(reloaded.items, [item1])
+  }
+
+  func testRemoveNonExistentItemIsSafeNoOp() throws {
+    let store = TranscriptHistoryStore(directoryURL: directoryURL)
+    let item1 = try store.add(text: "Keep me", createdAt: Date(timeIntervalSince1970: 10))
+
+    XCTAssertNoThrow(try store.remove(id: UUID()))
+    XCTAssertEqual(store.items, [item1])
+  }
 }

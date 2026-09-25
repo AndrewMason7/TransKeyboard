@@ -1,8 +1,8 @@
 import AVFoundation
-import Combine
 import Darwin
 import Foundation
 import ObjectiveC
+import Observation
 import UIKit
 
 enum RelayIdleShutdownPolicy {
@@ -21,8 +21,9 @@ enum RelayIdleShutdownPolicy {
   }
 }
 
+@Observable
 @MainActor
-final class RelayController: ObservableObject {
+final class RelayController {
   static let maximumDictationDuration: TimeInterval = 5 * 60
 
   struct PendingHostReturn: Equatable {
@@ -45,61 +46,67 @@ final class RelayController: ObservableObject {
     )
   #endif
 
-  @Published var isRelayRunning = false
-  @Published var isRelayStarting = false
-  @Published var status: RelayStatus = .offline
-  @Published var statusMessage = "Relay is offline"
-  @Published var history: [TranscriptHistoryItem] = []
-  @Published var recoverableRecordings: [RecoverableRecording] = []
-  @Published var retryingRecordingID: UUID?
-  @Published var activeStartedAt: Date?
-  @Published var isImagePickerPresented = false
-  @Published var imagePickerSource: UIImagePickerController.SourceType = .camera
-  @Published var isProcessingImage = false
-  @Published var ocrMessage = "Capture a page, sign, receipt, or screen"
-  @Published var isKeyboardHandoffActive = false
-  @Published var requiresManualKeyboardReturn = false
-  @Published var audioLevel: Double = 0
+  var isRelayRunning = false
+  var isRelayStarting = false
+  var status: RelayStatus = .offline
+  var statusMessage = "Relay is offline"
+  var history: [TranscriptHistoryItem] = []
+  var recoverableRecordings: [RecoverableRecording] = []
+  var retryingRecordingID: UUID?
+  var activeStartedAt: Date?
+  var isImagePickerPresented = false
+  var imagePickerSource: UIImagePickerController.SourceType = .camera
+  var isProcessingImage = false
+  var ocrMessage = "Capture a page, sign, receipt, or screen"
+  var isKeyboardHandoffActive = false
+  var requiresManualKeyboardReturn = false
+  var audioLevel: Double = 0
 
-  let configuration: AppConfiguration
-  let store: SharedRelayStore
-  let capture: AudioCaptureEngine
-  let client: GeminiTranscriptionClient
-  let recoveryStore: RecoverableRecordingStore
-  let historyStore: TranscriptHistoryStore
-  let liveActivity = VoiceRelayLiveActivityController()
-  let pollingQueue = DispatchQueue(label: "GeminiVoice.relay-polling")
+  @ObservationIgnored let configuration: AppConfiguration
+  @ObservationIgnored let store: SharedRelayStore
+  @ObservationIgnored let capture: AudioCaptureEngine
+  @ObservationIgnored let client: GeminiTranscriptionClient
+  @ObservationIgnored let recoveryStore: RecoverableRecordingStore
+  @ObservationIgnored let historyStore: TranscriptHistoryStore
+  @ObservationIgnored let liveActivity = VoiceRelayLiveActivityController()
+  @ObservationIgnored let pollingQueue = DispatchQueue(label: "GeminiVoice.relay-polling")
 
-  var pollTimer: DispatchSourceTimer?
-  var idleShutdownWorkItem: DispatchWorkItem?
-  var lastHandledSequence = 0
-  var heartbeatTick = 0
-  var activeRequestID: String?
-  var activeDictationAction: RelayDictationAction?
-  var maximumDurationWorkItem: DispatchWorkItem?
-  var pendingFinishWorkItem: DispatchWorkItem?
-  var returnToKeyboardWorkItem: DispatchWorkItem?
-  var returnToKeyboardGeneration = 0
-  var pendingHostReturn: PendingHostReturn?
-  var hostReturnAttemptCount = 0
-  var systemNavigationReturnDeadline: Date?
-  var systemNavigationReturnAccepted = false
-  var transcriptionBackgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
-  var ocrBackgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
-  var pendingOCRRequestID: String?
-  var pendingLaunchRequest: RelayLaunchRequest?
-  var relayStartupGeneration = 0
-  var transcriptionGeneration = 0
-  var transcriptionTask: Task<Void, Never>?
-  var processingRequestID: String?
-  var processingRecordingID: UUID?
-  var recoveryRetryTask: Task<Void, Never>?
-  var relaySessionID: String?
-  var liveRequestID: String?
-  var activeLiveSession: GeminiLiveSpeechSession?
-  var liveConnectionTask: Task<Void, Error>?
-  var lastLivePreviewAt = Date.distantPast
-  var pendingAudioRecoveryError: Error?
+  @ObservationIgnored var pollTimer: DispatchSourceTimer?
+  @ObservationIgnored var idleShutdownWorkItem: DispatchWorkItem?
+  @ObservationIgnored var lastHandledSequence = 0
+  @ObservationIgnored var heartbeatTick = 0
+  @ObservationIgnored var activeRequestID: String?
+  @ObservationIgnored var activeDictationAction: RelayDictationAction?
+  @ObservationIgnored var maximumDurationWorkItem: DispatchWorkItem?
+  @ObservationIgnored var pendingFinishWorkItem: DispatchWorkItem?
+  @ObservationIgnored var returnToKeyboardWorkItem: DispatchWorkItem?
+  @ObservationIgnored var returnToKeyboardGeneration = 0
+  @ObservationIgnored var pendingHostReturn: PendingHostReturn?
+  @ObservationIgnored var hostReturnAttemptCount = 0
+  @ObservationIgnored var systemNavigationReturnDeadline: Date?
+  @ObservationIgnored var systemNavigationReturnAccepted = false
+  @ObservationIgnored var transcriptionBackgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
+  @ObservationIgnored var ocrBackgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
+  @ObservationIgnored var pendingOCRRequestID: String?
+  @ObservationIgnored var pendingLaunchRequest: RelayLaunchRequest?
+  @ObservationIgnored var relayStartupGeneration = 0
+  @ObservationIgnored var transcriptionGeneration = 0
+  @ObservationIgnored var transcriptionTask: Task<Void, Never>?
+  @ObservationIgnored var processingRequestID: String?
+  @ObservationIgnored var processingRecordingID: UUID?
+  @ObservationIgnored var recoveryRetryTask: Task<Void, Never>?
+  @ObservationIgnored var relaySessionID: String?
+  @ObservationIgnored var liveRequestID: String?
+  @ObservationIgnored var activeLiveSession: GeminiLiveSpeechSession?
+  @ObservationIgnored var liveConnectionTask: Task<Void, Error>?
+  @ObservationIgnored var lastLivePreviewAt = Date.distantPast
+  @ObservationIgnored var pendingAudioRecoveryError: Error?
+
+  @ObservationIgnored let modelDownloadManager: ModelDownloadManager
+  @ObservationIgnored let localTextProcessor: LocalTextProcessor
+  @ObservationIgnored let localTranscriber: LocalSpeechTranscriber
+  @ObservationIgnored var isUsingLocalTranscriber = false
+  @ObservationIgnored var activeLocalAudioSegment: CapturedAudioSegment?
 
   init(
     configuration: AppConfiguration,
@@ -107,7 +114,10 @@ final class RelayController: ObservableObject {
     capture: AudioCaptureEngine = AudioCaptureEngine(),
     client: GeminiTranscriptionClient = GeminiTranscriptionClient(),
     recoveryStore: RecoverableRecordingStore = RecoverableRecordingStore(),
-    historyStore: TranscriptHistoryStore = TranscriptHistoryStore()
+    historyStore: TranscriptHistoryStore = TranscriptHistoryStore(),
+    modelDownloadManager: ModelDownloadManager = ModelDownloadManager(),
+    localTextProcessor: LocalTextProcessor? = nil,
+    localTranscriber: LocalSpeechTranscriber = LocalSpeechTranscriber()
   ) {
     self.configuration = configuration
     self.store = store
@@ -115,6 +125,9 @@ final class RelayController: ObservableObject {
     self.client = client
     self.recoveryStore = recoveryStore
     self.historyStore = historyStore
+    self.modelDownloadManager = modelDownloadManager
+    self.localTextProcessor = localTextProcessor ?? LocalTextProcessor(modelDownloadManager: modelDownloadManager)
+    self.localTranscriber = localTranscriber
     history = historyStore.items
     recoverableRecordings = recoveryStore.recordings
 
@@ -146,7 +159,7 @@ final class RelayController: ObservableObject {
       recoverIdleStateForPendingLaunchIfNeeded()
       preparePendingLaunchHandoffIfNeeded()
       scheduleIdleShutdownIfEligible()
-    } else {
+    } else if pendingLaunchRequest != nil || configuration.autoStartRelayOnLaunch {
       await startRelay()
     }
   }
@@ -255,6 +268,9 @@ final class RelayController: ObservableObject {
   func applicationDidEnterBackground() {
     cancelAutomaticReturnToKeyboard()
     isKeyboardHandoffActive = false
+    if configuration.autoStopRelayOnBackground, isRelayRunning {
+      stopRelay(message: "Relay stopped (app in background)", offlineReason: .stopped)
+    }
   }
 
   func cancelKeyboardHandoff() {

@@ -41,6 +41,8 @@
 	<string>$(GEMINI_DEFAULT_TRANSCRIPTION_MODEL)</string>
     <key>GeminiDefaultTranslationModel</key>
     <string>$(GEMINI_DEFAULT_TRANSLATION_MODEL)</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
@@ -49,6 +51,8 @@
     <string>Gemini Voice takes a photo you choose and sends it to Google Gemini to extract visible text.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Gemini Voice lets you choose an image and sends it to Google Gemini to extract visible text.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Gemini Voice uses on-device speech recognition to transcribe your voice locally and offline for the keyboard.</string>
     <key>NSSupportsLiveActivities</key>
     <true/>
     <key>UIApplicationSceneManifest</key>

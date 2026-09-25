@@ -13,6 +13,15 @@ extension RelayController {
     }
   }
 
+  func deleteHistoryItem(id: UUID) {
+    do {
+      try historyStore.remove(id: id)
+      history = historyStore.items
+    } catch {
+      statusMessage = error.localizedDescription
+    }
+  }
+
   func retryRecording(_ recording: RecoverableRecording) {
     guard retryingRecordingID == nil,
       status != .recording,

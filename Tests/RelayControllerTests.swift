@@ -36,16 +36,17 @@ private final class StubOCRURLProtocol: URLProtocol {
   override func stopLoading() {}
 }
 
-@MainActor
 final class RelayControllerTests: XCTestCase {
   private var suiteName: String!
   private var defaults: UserDefaults!
   private var directoryURL: URL!
 
+  @MainActor
   func testMaximumDictationDurationIsFiveMinutes() {
     XCTAssertEqual(RelayController.maximumDictationDuration, 5 * 60)
   }
 
+  @MainActor
   func testCancelCommandStopsProcessingAndDeletesStagedRecording() throws {
     let (controller, store) = try makeController()
     let requestID = UUID().uuidString
@@ -115,6 +116,7 @@ final class RelayControllerTests: XCTestCase {
     try super.tearDownWithError()
   }
 
+  @MainActor
   private func makeController() throws -> (RelayController, SharedRelayStore) {
     let bundleURL = directoryURL.appendingPathComponent("TestConfiguration.bundle")
     try FileManager.default.createDirectory(at: bundleURL, withIntermediateDirectories: true)
@@ -150,6 +152,7 @@ final class RelayControllerTests: XCTestCase {
     return (controller, store)
   }
 
+  @MainActor
   func testOCRResultIsPersistedToHistoryAndSurvivesTheNextDictation() async throws {
     let (controller, store) = try makeController()
     let requestID = UUID().uuidString
@@ -194,6 +197,7 @@ final class RelayControllerTests: XCTestCase {
   }
 
   #if GEMINI_PERSONAL_DEVICE
+    @MainActor
     func testManualReturnGuidanceIsNotReArmedByPolling() throws {
       let (controller, store) = try makeController()
       defer { controller.cancelAutomaticReturnToKeyboard() }
@@ -232,4 +236,34 @@ final class RelayControllerTests: XCTestCase {
       XCTAssertEqual(controller.hostReturnAttemptCount, 0)
     }
   #endif
+
+  @MainActor
+  func testApplicationDidEnterBackgroundStopsRelayWhenConfigured() throws {
+    let (controller, _) = try makeController()
+    controller.isRelayRunning = true
+    controller.setLocalStatus(.idle, message: "Ready")
+
+    // Default: autoStopRelayOnBackground is false
+    controller.configuration.autoStopRelayOnBackground = false
+    controller.applicationDidEnterBackground()
+    XCTAssertTrue(controller.isRelayRunning)
+
+    // When enabled: entering background stops the relay
+    controller.configuration.autoStopRelayOnBackground = true
+    controller.applicationDidEnterBackground()
+    XCTAssertFalse(controller.isRelayRunning)
+    XCTAssertEqual(controller.status, .offline)
+  }
+
+  @MainActor
+  func testApplicationDidBecomeActiveRespectsAutoStartRelayOnLaunch() async throws {
+    let (controller, _) = try makeController()
+    XCTAssertFalse(controller.isRelayRunning)
+
+    // With autoStartRelayOnLaunch false and no pending launch request,
+    // becoming active does not start relay.
+    controller.configuration.autoStartRelayOnLaunch = false
+    await controller.applicationDidBecomeActive()
+    XCTAssertFalse(controller.isRelayRunning)
+  }
 }

@@ -1,6 +1,7 @@
 import AVFoundation
 import Combine
 import Foundation
+import Speech
 import UIKit
 
 extension RelayController {
@@ -24,6 +25,14 @@ extension RelayController {
     let hadLiveStream = liveRequestID == activeRequestID
     if let activeRequestID {
       cancelLiveStream(matching: activeRequestID)
+    }
+    if isUsingLocalTranscriber {
+      localTranscriber.cancel()
+      isUsingLocalTranscriber = false
+    }
+    if let segment = activeLocalAudioSegment {
+      try? FileManager.default.removeItem(at: segment.url)
+      activeLocalAudioSegment = nil
     }
     capture.cancelSegment()
     audioLevel = 0
@@ -50,6 +59,14 @@ extension RelayController {
     transcriptionTask?.cancel()
     transcriptionTask = nil
     cancelLiveStream(matching: requestID)
+    if isUsingLocalTranscriber {
+      localTranscriber.cancel()
+      isUsingLocalTranscriber = false
+    }
+    if let segment = activeLocalAudioSegment {
+      try? FileManager.default.removeItem(at: segment.url)
+      activeLocalAudioSegment = nil
+    }
 
     let recordingID = processingRecordingID
     processingRequestID = nil
@@ -115,6 +132,25 @@ extension RelayController {
     activeDictationAction = nil
     activeStartedAt = nil
     isKeyboardHandoffActive = false
+
+    if isUsingLocalTranscriber {
+      activeLocalAudioSegment = segment
+      processingRequestID = requestID
+      transcriptionGeneration += 1
+      let processingMessage = action == .translate
+        ? "Finalizing on-device translation…"
+        : "Finalizing on-device transcript…"
+      publish(
+        .transcribing,
+        message: processingMessage,
+        activeRequestID: requestID,
+        activeDictationAction: action
+      )
+      beginTranscriptionBackgroundTaskIfNeeded()
+      localTranscriber.finish()
+      return
+    }
+
     let processingMessage: String
     if liveSession != nil {
       processingMessage =
@@ -192,13 +228,37 @@ extension RelayController {
               requestID,
               Self.safeErrorSummary(error)
             )
-            outputText = try await fallbackResult(
-              from: segment,
-              action: action,
-              translationTarget: translationTarget,
-              apiKey: apiKey
-            )
-            usedLiveStream = false
+            if self.configuration.speechEngineMode == .autoFallback {
+              do {
+                let localRaw = try await self.localFallbackResult(
+                  from: segment.url,
+                  action: action,
+                  translationTarget: translationTarget
+                )
+                if action == .translate {
+                  outputText = await self.localTextProcessor.translateText(localRaw, targetLanguageCode: translationTarget.code)
+                } else {
+                  outputText = await self.localTextProcessor.formatTranscript(localRaw)
+                }
+                usedLiveStream = false
+              } catch {
+                outputText = try await fallbackResult(
+                  from: segment,
+                  action: action,
+                  translationTarget: translationTarget,
+                  apiKey: apiKey
+                )
+                usedLiveStream = false
+              }
+            } else {
+              outputText = try await fallbackResult(
+                from: segment,
+                action: action,
+                translationTarget: translationTarget,
+                apiKey: apiKey
+              )
+              usedLiveStream = false
+            }
           }
         } else {
           outputText = try await fallbackResult(
@@ -365,6 +425,131 @@ extension RelayController {
       return liveError.localizedDescription
     default:
       return "stream connection failed"
+    }
+  }
+
+  func localFallbackResult(
+    from url: URL,
+    action: RelayDictationAction,
+    translationTarget: TranslationLanguage
+  ) async throws -> String {
+    let recognizer = SFSpeechRecognizer(locale: Locale.current)
+    guard let recognizer, recognizer.isAvailable else {
+      throw AudioCaptureError.sessionUnavailable("Local speech recognizer unavailable")
+    }
+    let request = SFSpeechURLRecognitionRequest(url: url)
+    request.taskHint = .dictation
+    request.addsPunctuation = true
+    if recognizer.supportsOnDeviceRecognition {
+      request.requiresOnDeviceRecognition = true
+    }
+
+    final class RecognitionState: @unchecked Sendable {
+      var task: SFSpeechRecognitionTask?
+      var didResume = false
+      let lock = NSLock()
+    }
+    let state = RecognitionState()
+
+    return try await withTaskCancellationHandler {
+      try await withCheckedThrowingContinuation { continuation in
+        let task = recognizer.recognitionTask(with: request) { result, error in
+          state.lock.lock()
+          defer { state.lock.unlock() }
+          guard !state.didResume else { return }
+          if let result, result.isFinal {
+            state.didResume = true
+            continuation.resume(returning: result.bestTranscription.formattedString)
+          } else if let error {
+            state.didResume = true
+            continuation.resume(throwing: error)
+          }
+        }
+        state.lock.lock()
+        state.task = task
+        if state.didResume {
+          task.cancel()
+        }
+        state.lock.unlock()
+      }
+    } onCancel: {
+      state.lock.lock()
+      state.task?.cancel()
+      state.lock.unlock()
+    }
+  }
+
+  func handleLocalTranscriptionResult(
+    _ result: Result<String, Error>,
+    requestID: String,
+    action: RelayDictationAction
+  ) {
+    guard activeRequestID == requestID || processingRequestID == requestID else {
+      NSLog("LOCAL_TRANSCRIPTION_DROPPED_STALE request=%@", requestID)
+      return
+    }
+    isUsingLocalTranscriber = false
+    switch result {
+    case .success(let rawText):
+      Task {
+        guard self.processingRequestID == requestID || self.activeRequestID == requestID else { return }
+        let processedText: String
+        if action == .translate {
+          processedText = await localTextProcessor.translateText(rawText, targetLanguageCode: configuration.translationTarget.code)
+        } else {
+          processedText = await localTextProcessor.formatTranscript(rawText)
+        }
+        guard self.processingRequestID == requestID || self.activeRequestID == requestID else { return }
+        self.finalizeLocalTranscription(processedText, requestID: requestID, action: action)
+      }
+    case .failure(let error):
+      guard self.processingRequestID == requestID || self.activeRequestID == requestID else { return }
+      self.processingRequestID = nil
+      self.endTranscriptionBackgroundTaskIfNeeded()
+      if let segment = self.activeLocalAudioSegment {
+        do {
+          _ = try self.recoveryStore.stage(
+            segment,
+            action: action,
+            translationTargetCode: self.configuration.translationTarget.code
+          )
+          self.refreshRecoverableRecordings()
+        } catch {
+          try? FileManager.default.removeItem(at: segment.url)
+        }
+        self.activeLocalAudioSegment = nil
+      }
+      self.publish(.error, message: error.localizedDescription, activeRequestID: requestID, activeDictationAction: action)
+      self.markRelayActivityAndScheduleIdleShutdown()
+    }
+  }
+
+  func finalizeLocalTranscription(
+    _ text: String,
+    requestID: String,
+    action: RelayDictationAction
+  ) {
+    if let segment = activeLocalAudioSegment {
+      try? FileManager.default.removeItem(at: segment.url)
+      activeLocalAudioSegment = nil
+    }
+    processingRequestID = nil
+    endTranscriptionBackgroundTaskIfNeeded()
+    do {
+      try addToHistory(text)
+      store.publishTranscript(
+        text,
+        requestID: requestID,
+        kind: .dictation
+      )
+      let completionMessage = action == .translate
+        ? "On-device translation inserted — ready"
+        : "On-device transcript inserted — ready"
+      publish(.idle, message: completionMessage)
+      markRelayActivityAndScheduleIdleShutdown()
+    } catch {
+      publish(.error, message: error.localizedDescription)
+      markRelayActivityAndScheduleIdleShutdown()
     }
   }
 }

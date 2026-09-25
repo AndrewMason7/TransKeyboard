@@ -376,12 +376,19 @@ extension RelayController {
       )
     }
 
-    /// LaunchServices' bundle-only open reactivates an existing app without a
-    /// URL payload that would reset its navigation. This is private SPI and is
-    /// intentionally absent from Release/App Store builds.
+    /// Reactivates an existing app using its registered URL scheme or LaunchServices.
     static func reactivateApplication(
       bundleIdentifier: String
     ) -> HostReactivationResult {
+      if let returnURL = PersonalDeviceHostFallback.returnURL(forBundleIdentifier: bundleIdentifier) {
+        if openURLViaWorkspaceOrApplication(returnURL) {
+          return HostReactivationResult(
+            accepted: true,
+            stage: "url-scheme"
+          )
+        }
+      }
+
       let workspaceClassName = ["LSApplication", "Workspace"].joined()
       let defaultWorkspaceSelector = NSSelectorFromString(
         ["default", "Workspace"].joined()
@@ -453,6 +460,65 @@ extension RelayController {
         accepted: accepted,
         stage: accepted ? "accepted" : "api-return-false"
       )
+    }
+
+    static func openURLViaWorkspaceOrApplication(_ url: URL) -> Bool {
+      let workspaceClassName = ["LSApplication", "Workspace"].joined()
+      let defaultWorkspaceSelector = NSSelectorFromString(
+        ["default", "Workspace"].joined()
+      )
+      let openURLSel = NSSelectorFromString("openURL:")
+      if let workspaceClass = NSClassFromString(workspaceClassName) as? NSObject.Type,
+         let defaultWorkspaceMethod = class_getClassMethod(
+           workspaceClass,
+           defaultWorkspaceSelector
+         ) {
+        typealias DefaultWorkspace = @convention(c) (AnyObject, Selector) -> AnyObject?
+        let defaultWorkspace = unsafeBitCast(
+          method_getImplementation(defaultWorkspaceMethod),
+          to: DefaultWorkspace.self
+        )
+        if let workspace = defaultWorkspace(workspaceClass, defaultWorkspaceSelector) as? NSObject,
+           workspace.responds(to: openURLSel) {
+          typealias OpenURL = @convention(c) (
+            AnyObject,
+            Selector,
+            NSURL
+          ) -> Bool
+          let openURL = unsafeBitCast(
+            workspace.method(for: openURLSel),
+            to: OpenURL.self
+          )
+          if openURL(workspace, openURLSel, url as NSURL) {
+            return true
+          }
+        }
+      }
+
+      let openSelector = NSSelectorFromString("openURL:options:completionHandler:")
+      if UIApplication.shared.responds(to: openSelector) {
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        return true
+      }
+      return false
+    }
+
+    var hostApplicationDisplayName: String {
+      if let bundleIdentifier = pendingLaunchRequest?.originatingApplicationBundleIdentifier
+        ?? pendingHostReturn?.bundleIdentifier {
+        return PersonalDeviceHostFallback.displayName(forBundleIdentifier: bundleIdentifier)
+      }
+      return "App"
+    }
+
+    func returnToHostApplication() {
+      let bundleIdentifier = pendingLaunchRequest?.originatingApplicationBundleIdentifier
+        ?? pendingHostReturn?.bundleIdentifier
+      if let bundleIdentifier {
+        _ = Self.reactivateApplication(bundleIdentifier: bundleIdentifier)
+      }
+      isKeyboardHandoffActive = false
+      requiresManualKeyboardReturn = false
     }
 
     func publishHandoffDiagnostic(

@@ -27,8 +27,13 @@ extension RelayController {
 
   func handleDeepLink(_ url: URL) {
     if url.scheme?.lowercased() == "geminivoice", url.host?.lowercased() == "open" {
-      // The keyboard's brand mark just brings the app forward. There is no
-      // request to claim, and the scene-phase handler starts the relay.
+      // The keyboard's brand mark brings the app forward.
+      #if GEMINI_PERSONAL_DEVICE
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        if let originBundle = components?.queryItems?.first(where: { $0.name == "originBundleID" })?.value {
+          pendingHostReturn = PendingHostReturn(requestID: UUID().uuidString, bundleIdentifier: originBundle)
+        }
+      #endif
       return
     }
     if let request = RelayLaunchRequest.parse(url) {
@@ -133,11 +138,7 @@ extension RelayController {
   }
 
   func requestMicrophonePermission() async -> Bool {
-    await withCheckedContinuation { continuation in
-      AVAudioApplication.requestRecordPermission { granted in
-        continuation.resume(returning: granted)
-      }
-    }
+    await AVAudioApplication.requestRecordPermission()
   }
 
   func preparedJPEGData(from image: UIImage) -> Data? {

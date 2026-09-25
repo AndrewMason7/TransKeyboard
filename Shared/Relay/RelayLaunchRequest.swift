@@ -223,13 +223,124 @@ enum RelayHostReturnPolicy {
 }
 
 #if GEMINI_PERSONAL_DEVICE
-  /// Personal-device Debug builds may use the Messages destination only after a
-  /// strict host-process match. An unknown host remains unknown and must use the
-  /// manual swipe-back path.
+  /// Personal-device Debug builds use strict host-process and bundle matching
+  /// to identify the active typing app and its return URL scheme.
   enum PersonalDeviceHostFallback {
+    struct HostAppDefinition: Equatable {
+      let bundleIdentifier: String
+      let displayName: String
+      let returnURL: URL?
+    }
+
     static let messagesBundleIdentifier = ["com", "apple", "MobileSMS"]
       .joined(separator: ".")
     static let messagesProcessName = ["Mobile", "SMS"].joined()
+
+    static let knownHostsByProcessName: [String: HostAppDefinition] = [
+      "MobileSMS": HostAppDefinition(
+        bundleIdentifier: "com.apple.MobileSMS",
+        displayName: "Messages",
+        returnURL: URL(string: "sms:")
+      ),
+      "MobileNotes": HostAppDefinition(
+        bundleIdentifier: "com.apple.mobilenotes",
+        displayName: "Notes",
+        returnURL: URL(string: "mobilenotes://")
+      ),
+      "MobileSafari": HostAppDefinition(
+        bundleIdentifier: "com.apple.mobilesafari",
+        displayName: "Safari",
+        returnURL: URL(string: "x-web-search://")
+      ),
+      "MobileMail": HostAppDefinition(
+        bundleIdentifier: "com.apple.mobilemail",
+        displayName: "Mail",
+        returnURL: URL(string: "message://")
+      ),
+      "Reminders": HostAppDefinition(
+        bundleIdentifier: "com.apple.reminders",
+        displayName: "Reminders",
+        returnURL: URL(string: "x-apple-reminderkit://")
+      ),
+      "Preferences": HostAppDefinition(
+        bundleIdentifier: "com.apple.Preferences",
+        displayName: "Settings",
+        returnURL: URL(string: "App-Prefs://")
+      ),
+      "Slack": HostAppDefinition(
+        bundleIdentifier: "com.tinyspeck.chatlyio",
+        displayName: "Slack",
+        returnURL: URL(string: "slack://")
+      ),
+      "WhatsApp": HostAppDefinition(
+        bundleIdentifier: "net.whatsapp.WhatsApp",
+        displayName: "WhatsApp",
+        returnURL: URL(string: "whatsapp://")
+      ),
+      "Telegram": HostAppDefinition(
+        bundleIdentifier: "ph.telegra.Telegraph",
+        displayName: "Telegram",
+        returnURL: URL(string: "tg://")
+      ),
+      "Discord": HostAppDefinition(
+        bundleIdentifier: "com.hammerandchisel.discord",
+        displayName: "Discord",
+        returnURL: URL(string: "discord://")
+      ),
+    ]
+
+    static let knownHostsByBundleIdentifier: [String: HostAppDefinition] = [
+      "com.apple.MobileSMS": HostAppDefinition(
+        bundleIdentifier: "com.apple.MobileSMS",
+        displayName: "Messages",
+        returnURL: URL(string: "sms:")
+      ),
+      "com.apple.mobilenotes": HostAppDefinition(
+        bundleIdentifier: "com.apple.mobilenotes",
+        displayName: "Notes",
+        returnURL: URL(string: "mobilenotes://")
+      ),
+      "com.apple.mobilesafari": HostAppDefinition(
+        bundleIdentifier: "com.apple.mobilesafari",
+        displayName: "Safari",
+        returnURL: URL(string: "x-web-search://")
+      ),
+      "com.apple.mobilemail": HostAppDefinition(
+        bundleIdentifier: "com.apple.mobilemail",
+        displayName: "Mail",
+        returnURL: URL(string: "message://")
+      ),
+      "com.apple.reminders": HostAppDefinition(
+        bundleIdentifier: "com.apple.reminders",
+        displayName: "Reminders",
+        returnURL: URL(string: "x-apple-reminderkit://")
+      ),
+      "com.apple.Preferences": HostAppDefinition(
+        bundleIdentifier: "com.apple.Preferences",
+        displayName: "Settings",
+        returnURL: URL(string: "App-Prefs://")
+      ),
+      "com.tinyspeck.chatlyio": HostAppDefinition(
+        bundleIdentifier: "com.tinyspeck.chatlyio",
+        displayName: "Slack",
+        returnURL: URL(string: "slack://")
+      ),
+      "net.whatsapp.WhatsApp": HostAppDefinition(
+        bundleIdentifier: "net.whatsapp.WhatsApp",
+        displayName: "WhatsApp",
+        returnURL: URL(string: "whatsapp://")
+      ),
+      "ph.telegra.Telegraph": HostAppDefinition(
+        bundleIdentifier: "ph.telegra.Telegraph",
+        displayName: "Telegram",
+        returnURL: URL(string: "tg://")
+      ),
+      "com.hammerandchisel.discord": HostAppDefinition(
+        bundleIdentifier: "com.hammerandchisel.discord",
+        displayName: "Discord",
+        returnURL: URL(string: "discord://")
+      ),
+    ]
 
     static func destination(
       resolvedBundleIdentifier: String?,
@@ -243,8 +354,34 @@ enum RelayHostReturnPolicy {
         return resolvedBundleIdentifier
       }
 
-      guard hostProcessName == messagesProcessName else { return nil }
-      return messagesBundleIdentifier
+      guard let hostProcessName else { return nil }
+      if let known = knownHostsByProcessName[hostProcessName] {
+        return known.bundleIdentifier
+      }
+      return nil
+    }
+
+    static func returnURL(forBundleIdentifier bundleIdentifier: String) -> URL? {
+      if let known = knownHostsByBundleIdentifier[bundleIdentifier] {
+        return known.returnURL
+      }
+      // Derivation for third-party apps: try app name scheme
+      if let lastComponent = bundleIdentifier.components(separatedBy: ".").last?.lowercased(),
+         !lastComponent.isEmpty {
+        return URL(string: "\(lastComponent)://")
+      }
+      return nil
+    }
+
+    static func displayName(forBundleIdentifier bundleIdentifier: String) -> String {
+      if let known = knownHostsByBundleIdentifier[bundleIdentifier] {
+        return known.displayName
+      }
+      if let lastComponent = bundleIdentifier.components(separatedBy: ".").last,
+         !lastComponent.isEmpty {
+        return lastComponent.capitalized
+      }
+      return "App"
     }
 
     /// Accept a keyboard-arbiter source only when it belongs to the exact host

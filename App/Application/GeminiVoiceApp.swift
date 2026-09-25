@@ -2,9 +2,10 @@ import SwiftUI
 
 @main
 struct GeminiVoiceApp: App {
+  @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   @Environment(\.scenePhase) private var scenePhase
-  @StateObject private var configuration: AppConfiguration
-  @StateObject private var relay: RelayController
+  @State private var configuration: AppConfiguration
+  @State private var relay: RelayController
 
   init() {
     #if DEBUG
@@ -13,8 +14,8 @@ struct GeminiVoiceApp: App {
       }
     #endif
     let configuration = AppConfiguration()
-    _configuration = StateObject(wrappedValue: configuration)
-    _relay = StateObject(
+    _configuration = State(wrappedValue: configuration)
+    _relay = State(
       wrappedValue: RelayController(configuration: configuration)
     )
   }

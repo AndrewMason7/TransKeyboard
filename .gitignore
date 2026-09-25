@@ -28,3 +28,7 @@ DEPLOYMENT.local.md
 *.dSYM
 *.dSYM.zip
 SourcePackages/
+.mobilebuildmcp/
+.agents/
+*.jpeg
+*.jpg

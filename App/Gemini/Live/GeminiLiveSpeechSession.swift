@@ -18,8 +18,11 @@ actor GeminiLiveSpeechSession {
 
   typealias SocketFactory = @Sendable (GeminiLiveEndpoint) -> any GeminiLiveSocket
 
-  static let transcriptionModel = "gemini-3.5-transcribe-live"
-  static let translationModel = "gemini-3.5-live-translate-preview"
+  public static let defaultTranscriptionModel = "gemini-3.5-transcribe-live"
+  public static let defaultTranslationModel = "gemini-3.5-live-translate-preview"
+
+  static var transcriptionModel: String { defaultTranscriptionModel }
+  static var translationModel: String { defaultTranslationModel }
 
   static func mode(
     for action: RelayDictationAction,
@@ -31,6 +34,7 @@ actor GeminiLiveSpeechSession {
   }
 
   let mode: Mode
+  let model: String
   let progressHandler: (@Sendable (String) -> Void)?
   let socketFactory: SocketFactory
   nonisolated let audioStream: AsyncStream<Data>
@@ -58,6 +62,7 @@ actor GeminiLiveSpeechSession {
 
   init(
     mode: Mode,
+    model: String = defaultTranscriptionModel,
     socketFactory: @escaping SocketFactory = { endpoint in
       URLSessionGeminiLiveSocket(endpoint: endpoint)
     },
@@ -67,6 +72,7 @@ actor GeminiLiveSpeechSession {
       bufferingPolicy: .bufferingNewest(500)
     )
     self.mode = mode
+    self.model = model
     self.socketFactory = socketFactory
     self.progressHandler = progressHandler
     self.audioStream = streamPair.stream
@@ -94,7 +100,7 @@ actor GeminiLiveSpeechSession {
     }
 
     do {
-      try await send(Self.setupMessage(for: mode), over: socket)
+      try await send(Self.setupMessage(for: mode, model: model), over: socket)
       for _ in 0..<50 {
         try Task.checkCancellation()
         if let terminalError { throw terminalError }

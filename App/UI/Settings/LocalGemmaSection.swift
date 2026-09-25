@@ -21,6 +21,12 @@ struct LocalGemmaSection: View {
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
 
+      Text("Provided under Apache 2.0. Subject to the [Google Gemma Terms of Use](https://ai.google.dev/gemma/terms).")
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .tint(GeminiVoiceTheme.accentColor)
+        .fixedSize(horizontal: false, vertical: true)
+
       downloadStatusContent
     }
   }

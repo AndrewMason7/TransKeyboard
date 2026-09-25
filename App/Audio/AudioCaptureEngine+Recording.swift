@@ -17,165 +17,174 @@ extension AudioCaptureEngine {
       throw AudioCaptureError.sharedContainerUnavailable
     }
 
-    fileLock.lock()
-    defer { fileLock.unlock() }
+    try performOnAudioProcessingQueue {
+      fileLock.lock()
+      defer { fileLock.unlock() }
 
-    guard activeFile == nil else {
-      throw AudioCaptureError.alreadyRecording
-    }
+      guard activeFile == nil else {
+        throw AudioCaptureError.alreadyRecording
+      }
 
-    let recordings = container.appendingPathComponent("Recordings", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: recordings,
-      withIntermediateDirectories: true
-    )
-    try Self.protectRecordingItem(at: recordings)
+      let recordings = container.appendingPathComponent("Recordings", isDirectory: true)
+      try FileManager.default.createDirectory(
+        at: recordings,
+        withIntermediateDirectories: true
+      )
+      try Self.protectRecordingItem(at: recordings)
 
-    let safeID = requestID.replacingOccurrences(
-      of: "[^A-Za-z0-9-]",
-      with: "-",
-      options: .regularExpression
-    )
-    let url = recordings.appendingPathComponent("in-progress-dictation-\(safeID).wav")
+      let safeID = requestID.replacingOccurrences(
+        of: "[^A-Za-z0-9-]",
+        with: "-",
+        options: .regularExpression
+      )
+      let url = recordings.appendingPathComponent("in-progress-dictation-\(safeID).wav")
 
-    var settings = format.settings
-    settings[AVFormatIDKey] = kAudioFormatLinearPCM
-    settings[AVLinearPCMBitDepthKey] = 16
-    settings[AVLinearPCMIsFloatKey] = false
-    settings[AVLinearPCMIsBigEndianKey] = false
+      var settings = format.settings
+      settings[AVFormatIDKey] = kAudioFormatLinearPCM
+      settings[AVLinearPCMBitDepthKey] = 16
+      settings[AVLinearPCMIsFloatKey] = false
+      settings[AVLinearPCMIsBigEndianKey] = false
 
-    let file = try AVAudioFile(
-      forWriting: url,
-      settings: settings,
-      commonFormat: format.commonFormat,
-      interleaved: format.isInterleaved
-    )
-    do {
-      try Self.protectRecordingItem(at: url)
-    } catch {
-      try? FileManager.default.removeItem(at: url)
-      throw AudioCaptureError.secureStorageUnavailable(error.localizedDescription)
-    }
+      let file = try AVAudioFile(
+        forWriting: url,
+        settings: settings,
+        commonFormat: format.commonFormat,
+        interleaved: format.isInterleaved
+      )
+      do {
+        try Self.protectRecordingItem(at: url)
+      } catch {
+        try? FileManager.default.removeItem(at: url)
+        throw AudioCaptureError.secureStorageUnavailable(error.localizedDescription)
+      }
 
-    activeFile = file
-    activeURL = url
-    activeRequestID = requestID
-    activeAction = action
-    activeTranslationTargetCode = translationTargetCode
-    activeStartedAt = date
-    writeFailure = nil
-    lastLevelPublishedAt = 0
-    streamingConverter?.reset()
-    streamingChunker.reset()
-    self.audioChunkHandler = audioChunkHandler
-    self.audioStreamingFailureHandler = audioStreamingFailureHandler
-    didReportStreamingFailure = false
-    if audioChunkHandler != nil, streamingConverter == nil {
-      reportStreamingFailure("The microphone audio format could not be converted for Gemini Live.")
+      activeFile = file
+      activeURL = url
+      activeRequestID = requestID
+      activeAction = action
+      activeTranslationTargetCode = translationTargetCode
+      activeStartedAt = date
+      writeFailure = nil
+      lastLevelPublishedAt = 0
+      streamingConverter?.reset()
+      streamingChunker.reset()
+      self.audioChunkHandler = audioChunkHandler
+      self.audioStreamingFailureHandler = audioStreamingFailureHandler
+      didReportStreamingFailure = false
+      if audioChunkHandler != nil, streamingConverter == nil {
+        reportStreamingFailure("The microphone audio format could not be converted for Gemini Live.")
+      }
+      isRecordingActive = true
     }
   }
 
   func endSegment(at date: Date = Date()) throws -> CapturedAudioSegment {
-    fileLock.lock()
-    guard let url = activeURL,
-      let requestID = activeRequestID,
-      let action = activeAction,
-      let translationTargetCode = activeTranslationTargetCode,
-      let startedAt = activeStartedAt
-    else {
-      fileLock.unlock()
-      throw AudioCaptureError.notRecording
-    }
-
-    let chunkHandler = audioChunkHandler
-    var finalStreamingChunks: [Data] = []
-    if chunkHandler != nil {
-      for convertedTail in finishStreamingPCMData() {
-        finalStreamingChunks.append(contentsOf: streamingChunker.append(convertedTail))
+    try performOnAudioProcessingQueue {
+      isRecordingActive = false
+      fileLock.lock()
+      guard let url = activeURL,
+        let requestID = activeRequestID,
+        let action = activeAction,
+        let translationTargetCode = activeTranslationTargetCode,
+        let startedAt = activeStartedAt
+      else {
+        fileLock.unlock()
+        throw AudioCaptureError.notRecording
       }
-    }
-    if let finalStreamingChunk = streamingChunker.finish() {
-      finalStreamingChunks.append(finalStreamingChunk)
-    }
-    streamingConverter?.reset()
-    activeFile = nil
-    activeURL = nil
-    activeRequestID = nil
-    activeAction = nil
-    activeTranslationTargetCode = nil
-    activeStartedAt = nil
-    audioChunkHandler = nil
-    audioStreamingFailureHandler = nil
 
-    if let writeFailure, chunkHandler == nil {
+      let chunkHandler = audioChunkHandler
+      var finalStreamingChunks: [Data] = []
+      if chunkHandler != nil {
+        for convertedTail in finishStreamingPCMData() {
+          finalStreamingChunks.append(contentsOf: streamingChunker.append(convertedTail))
+        }
+      }
+      if let finalStreamingChunk = streamingChunker.finish() {
+        finalStreamingChunks.append(finalStreamingChunk)
+      }
+      streamingConverter?.reset()
+      activeFile = nil
+      activeURL = nil
+      activeRequestID = nil
+      activeAction = nil
+      activeTranslationTargetCode = nil
+      activeStartedAt = nil
+      audioChunkHandler = nil
+      audioStreamingFailureHandler = nil
+
+      if let writeFailure, chunkHandler == nil {
+        self.writeFailure = nil
+        fileLock.unlock()
+        throw AudioCaptureError.writeFailed(writeFailure.localizedDescription)
+      }
+      if let writeFailure {
+        NSLog(
+          "AUDIO_FALLBACK_RECORDING_FAILED request=%@ error=%@",
+          requestID,
+          errorSummary(writeFailure)
+        )
+      }
       self.writeFailure = nil
+
       fileLock.unlock()
-      throw AudioCaptureError.writeFailed(writeFailure.localizedDescription)
-    }
-    if let writeFailure {
-      NSLog(
-        "AUDIO_FALLBACK_RECORDING_FAILED request=%@ error=%@",
-        requestID,
-        errorSummary(writeFailure)
+
+      if let chunkHandler {
+        finalStreamingChunks.forEach(chunkHandler)
+      }
+
+      let safeTarget = translationTargetCode.replacingOccurrences(
+        of: "[^A-Za-z0-9-]",
+        with: "-",
+        options: .regularExpression
+      )
+      let safeID = requestID.replacingOccurrences(
+        of: "[^A-Za-z0-9-]",
+        with: "-",
+        options: .regularExpression
+      )
+      let finalizedURL = url.deletingLastPathComponent().appendingPathComponent(
+        "completed-\(action.rawValue)-\(safeTarget)-\(safeID).wav"
+      )
+      do {
+        try FileManager.default.moveItem(at: url, to: finalizedURL)
+        try Self.protectRecordingItem(at: finalizedURL)
+      } catch {
+        try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: finalizedURL)
+        throw AudioCaptureError.secureStorageUnavailable(error.localizedDescription)
+      }
+
+      return CapturedAudioSegment(
+        requestID: requestID,
+        url: finalizedURL,
+        startedAt: startedAt,
+        endedAt: date
       )
     }
-    self.writeFailure = nil
-
-    fileLock.unlock()
-
-    if let chunkHandler {
-      finalStreamingChunks.forEach(chunkHandler)
-    }
-
-    let safeTarget = translationTargetCode.replacingOccurrences(
-      of: "[^A-Za-z0-9-]",
-      with: "-",
-      options: .regularExpression
-    )
-    let safeID = requestID.replacingOccurrences(
-      of: "[^A-Za-z0-9-]",
-      with: "-",
-      options: .regularExpression
-    )
-    let finalizedURL = url.deletingLastPathComponent().appendingPathComponent(
-      "completed-\(action.rawValue)-\(safeTarget)-\(safeID).wav"
-    )
-    do {
-      try FileManager.default.moveItem(at: url, to: finalizedURL)
-      try Self.protectRecordingItem(at: finalizedURL)
-    } catch {
-      try? FileManager.default.removeItem(at: url)
-      try? FileManager.default.removeItem(at: finalizedURL)
-      throw AudioCaptureError.secureStorageUnavailable(error.localizedDescription)
-    }
-
-    return CapturedAudioSegment(
-      requestID: requestID,
-      url: finalizedURL,
-      startedAt: startedAt,
-      endedAt: date
-    )
   }
 
   func cancelSegment() {
-    fileLock.lock()
-    let url = activeURL
-    activeFile = nil
-    activeURL = nil
-    activeRequestID = nil
-    activeAction = nil
-    activeTranslationTargetCode = nil
-    activeStartedAt = nil
-    writeFailure = nil
-    audioChunkHandler = nil
-    audioStreamingFailureHandler = nil
-    didReportStreamingFailure = false
-    streamingChunker.reset()
-    streamingConverter?.reset()
-    fileLock.unlock()
+    performOnAudioProcessingQueue {
+      isRecordingActive = false
+      fileLock.lock()
+      let url = activeURL
+      activeFile = nil
+      activeURL = nil
+      activeRequestID = nil
+      activeAction = nil
+      activeTranslationTargetCode = nil
+      activeStartedAt = nil
+      writeFailure = nil
+      audioChunkHandler = nil
+      audioStreamingFailureHandler = nil
+      didReportStreamingFailure = false
+      streamingChunker.reset()
+      streamingConverter?.reset()
+      fileLock.unlock()
 
-    if let url {
-      try? FileManager.default.removeItem(at: url)
+      if let url {
+        try? FileManager.default.removeItem(at: url)
+      }
     }
   }
 

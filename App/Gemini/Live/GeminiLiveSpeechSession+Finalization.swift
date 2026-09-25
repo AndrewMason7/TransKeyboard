@@ -42,7 +42,7 @@ extension GeminiLiveSpeechSession {
     }
     guard let socket, isConfigured else {
       await close(code: .goingAway)
-      throw GeminiLiveSpeechError.connectionClosed("")
+      throw GeminiLiveSpeechError.connectionClosed("The streaming socket is not connected or configured.")
     }
 
     var transcriptionBoundarySentAt: Date?

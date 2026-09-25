@@ -21,7 +21,40 @@ final class AudioCaptureEngine: @unchecked Sendable {
 
   var engine = AVAudioEngine()
   let fileLock = NSLock()
+  private static let audioQueueKey = DispatchSpecificKey<Void>()
+  let audioProcessingQueue = DispatchQueue(
+    label: (Bundle.main.bundleIdentifier ?? "com.example.GeminiVoiceSample") + ".audio-processing",
+    qos: .userInitiated
+  )
   var recoverableRecordingScanGate = RecoverableRecordingScanGate()
+
+  func performOnAudioProcessingQueue<T>(_ block: () throws -> T) rethrows -> T {
+    if DispatchQueue.getSpecific(key: Self.audioQueueKey) != nil {
+      return try block()
+    } else {
+      return try audioProcessingQueue.sync(execute: block)
+    }
+  }
+
+  private let recordingGateLock: os_unfair_lock_t = {
+    let lock = os_unfair_lock_t.allocate(capacity: 1)
+    lock.initialize(to: os_unfair_lock())
+    return lock
+  }()
+  private var _isRecordingActive = false
+
+  var isRecordingActive: Bool {
+    get {
+      os_unfair_lock_lock(recordingGateLock)
+      defer { os_unfair_lock_unlock(recordingGateLock) }
+      return _isRecordingActive
+    }
+    set {
+      os_unfair_lock_lock(recordingGateLock)
+      _isRecordingActive = newValue
+      os_unfair_lock_unlock(recordingGateLock)
+    }
+  }
 
   var inputFormat: AVAudioFormat?
   var streamingConverter: AVAudioConverter?
@@ -51,14 +84,24 @@ final class AudioCaptureEngine: @unchecked Sendable {
   var levelHandler: ((Double) -> Void)?
 
   init() {
+    audioProcessingQueue.setSpecific(key: Self.audioQueueKey, value: ())
     let center = NotificationCenter.default
     observers.append(
       center.addObserver(
-        forName: AVAudioSession.interruptionNotification,
+        forName: AVAudioSession.didBecomeInactiveNotification,
         object: AVAudioSession.sharedInstance(),
         queue: .main
       ) { [weak self] notification in
-        self?.handleInterruption(notification)
+        self?.handleSessionDidBecomeInactive(notification)
+      }
+    )
+    observers.append(
+      center.addObserver(
+        forName: AVAudioSession.resumptionRecommendationNotification,
+        object: AVAudioSession.sharedInstance(),
+        queue: .main
+      ) { [weak self] notification in
+        self?.handleResumptionRecommendation(notification)
       }
     )
     observeEngineConfiguration()
@@ -162,5 +205,7 @@ final class AudioCaptureEngine: @unchecked Sendable {
       NotificationCenter.default.removeObserver(engineConfigurationObserver)
     }
     stop()
+    recordingGateLock.deinitialize(count: 1)
+    recordingGateLock.deallocate()
   }
 }

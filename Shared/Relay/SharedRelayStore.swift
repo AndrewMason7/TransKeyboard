@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-final class SharedRelayStore {
+final class SharedRelayStore: @unchecked Sendable {
   private struct PendingLaunchRecord: Codable {
     static let currentVersion = 2
 
@@ -249,7 +249,6 @@ final class SharedRelayStore {
     }
     defaults.set(min(max(level, 0), 1), forKey: Key.audioLevel)
     defaults.set(Date().timeIntervalSince1970, forKey: Key.audioLevelUpdatedAt)
-    flush()
   }
 
   func touchHeartbeat(_ date: Date = Date()) {
@@ -413,10 +412,20 @@ final class SharedRelayStore {
       return operation()
     }
 
-    _ = flock(handle.fileDescriptor, LOCK_EX)
+    var acquired = false
+    for _ in 0..<10 {
+      if flock(handle.fileDescriptor, LOCK_EX | LOCK_NB) == 0 {
+        acquired = true
+        break
+      }
+      usleep(2_000)
+    }
+    if !acquired {
+      _ = flock(handle.fileDescriptor, LOCK_EX)
+    }
     defer {
       _ = flock(handle.fileDescriptor, LOCK_UN)
-      handle.closeFile()
+      try? handle.close()
     }
     defaults.synchronize()
     return operation()
@@ -441,7 +450,7 @@ final class SharedRelayStore {
     _ = flock(handle.fileDescriptor, LOCK_EX)
     defer {
       _ = flock(handle.fileDescriptor, LOCK_UN)
-      handle.closeFile()
+      try? handle.close()
     }
     defaults.synchronize()
     return operation()
@@ -471,7 +480,7 @@ final class SharedRelayStore {
     _ = flock(handle.fileDescriptor, LOCK_EX)
     defer {
       _ = flock(handle.fileDescriptor, LOCK_UN)
-      handle.closeFile()
+      try? handle.close()
     }
     defaults.synchronize()
     return operation()

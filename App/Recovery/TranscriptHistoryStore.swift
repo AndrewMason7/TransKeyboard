@@ -10,6 +10,21 @@ struct TranscriptHistoryItem: Codable, Identifiable, Equatable {
     self.text = text
     self.createdAt = createdAt
   }
+
+  // FIX #6 (per Raj & Karen): Zero-allocation word count calculation
+  var wordCount: Int {
+    var count = 0
+    var inWord = false
+    for char in text {
+      if char.isWhitespace {
+        inWord = false
+      } else if !inWord {
+        inWord = true
+        count += 1
+      }
+    }
+    return count
+  }
 }
 
 /// Keeps completed text durable before its only audio copy is removed.
@@ -46,6 +61,18 @@ final class TranscriptHistoryStore {
     do {
       try persist()
       return item
+    } catch {
+      items = oldItems
+      throw error
+    }
+  }
+
+  func remove(id: UUID) throws {
+    guard items.contains(where: { $0.id == id }) else { return }
+    let oldItems = items
+    items.removeAll { $0.id == id }
+    do {
+      try persist()
     } catch {
       items = oldItems
       throw error

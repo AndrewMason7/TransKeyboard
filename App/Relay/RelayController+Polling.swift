@@ -42,9 +42,7 @@ extension RelayController {
     else { return }
 
     let workItem = DispatchWorkItem { [weak self] in
-      Task { @MainActor [weak self] in
-        self?.idleShutdownDeadlineReached()
-      }
+      self?.idleShutdownDeadlineReached()
     }
     idleShutdownWorkItem = workItem
     DispatchQueue.main.asyncAfter(
@@ -62,9 +60,7 @@ extension RelayController {
     let hasPendingCommand = store.pendingCommand(after: lastHandledSequence) != nil
     if hasPendingCommand {
       let recheck = DispatchWorkItem { [weak self] in
-        Task { @MainActor [weak self] in
-          self?.idleShutdownDeadlineReached()
-        }
+        self?.idleShutdownDeadlineReached()
       }
       idleShutdownWorkItem = recheck
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: recheck)

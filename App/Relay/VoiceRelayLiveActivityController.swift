@@ -4,17 +4,26 @@ import Foundation
 @MainActor
 final class VoiceRelayLiveActivityOperationQueue {
   private var operationTask: Task<Void, Never>?
+  private var latestOperationID: UInt64 = 0
 
   func enqueue(_ operation: @escaping @MainActor () async -> Void) {
     let previousOperation = operationTask
-    operationTask = Task { @MainActor in
+    latestOperationID &+= 1
+    let operationID = latestOperationID
+    operationTask = Task { @MainActor [weak self] in
       await previousOperation?.value
       await operation()
+      guard let self else { return }
+      if self.latestOperationID == operationID {
+        self.operationTask = nil
+      }
     }
   }
 
   func waitUntilIdle() async {
-    await operationTask?.value
+    while let currentTask = operationTask {
+      await currentTask.value
+    }
   }
 }
 

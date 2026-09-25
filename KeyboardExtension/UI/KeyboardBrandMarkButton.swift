@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct KeyboardBrandMarkButton: View {
-  @ObservedObject var state: KeyboardToolbarState
+  var state: KeyboardToolbarState
   @Environment(\.colorScheme) private var colorScheme
 
   var body: some View {
@@ -9,39 +9,29 @@ struct KeyboardBrandMarkButton: View {
       state.onBrandTap?()
     } label: {
       ZStack {
-        RoundedRectangle(cornerRadius: 11)
-          .fill(
-            LinearGradient(
-              colors: [
-                Color(red: 0.25, green: 0.55, blue: 1.0),
-                Color(red: 0.55, green: 0.35, blue: 0.95),
-                Color(red: 0.85, green: 0.30, blue: 0.75),
-              ],
-              startPoint: .topLeading,
-              endPoint: .bottomTrailing
-            )
-          )
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+          .fill(LinearGradient.geminiVoicePrimary)
           .overlay {
-            RoundedRectangle(cornerRadius: 11)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
               .strokeBorder(
-                Color.white.opacity(colorScheme == .dark ? 0.35 : 0.45),
+                Color.white.opacity(colorScheme == .dark ? 0.35 : 0.50),
                 lineWidth: 0.5
               )
           }
           .shadow(
-            color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.15),
+            color: GeminiVoiceTheme.accentColor.opacity(colorScheme == .dark ? 0.35 : 0.20),
             radius: 3,
             x: 0,
-            y: 1.5
+            y: 1
           )
 
         Image(systemName: "sparkles")
-          .font(.system(size: 17, weight: .bold))
+          .font(.system(size: 15, weight: .bold))
           .foregroundStyle(.white)
           .symbolRenderingMode(.hierarchical)
       }
+      .frame(width: 30, height: 30)
       .frame(width: 34, height: 34)
-      .frame(width: 40, height: 40)
       .contentShape(Rectangle())
     }
     .buttonStyle(ScaleButtonStyle())

@@ -27,29 +27,33 @@ struct KeyboardToolbarActionButton: View {
               )
           }
           .shadow(
-            color: Color.black.opacity(colorScheme == .dark ? 0.30 : 0.15),
+            color: backgroundColor.opacity(colorScheme == .dark ? 0.35 : 0.20),
             radius: 3,
             x: 0,
-            y: 1.5
+            y: 1
           )
 
         Image(systemName: iconName)
-          .font(.system(size: 16, weight: .semibold))
+          .font(.system(size: 14, weight: .semibold))
           .foregroundStyle(foregroundColor)
 
         if let badgeText {
           Text(badgeText)
-            .font(.system(size: 8, weight: .bold, design: .rounded))
+            .font(.system(size: 7.5, weight: .heavy, design: .rounded))
             .foregroundStyle(.white)
             .padding(.horizontal, 3)
             .padding(.vertical, 1)
-            .background(Color.black.opacity(0.55))
+            .background(Color.black.opacity(0.65))
             .clipShape(Capsule())
-            .offset(x: 10, y: 10)
+            .overlay {
+              Capsule()
+                .strokeBorder(Color.white.opacity(0.35), lineWidth: 0.5)
+            }
+            .offset(x: 9, y: 9)
         }
       }
+      .frame(width: 30, height: 30)
       .frame(width: 34, height: 34)
-      .frame(width: 40, height: 40)
       .contentShape(Rectangle())
     }
     .buttonStyle(ScaleButtonStyle())

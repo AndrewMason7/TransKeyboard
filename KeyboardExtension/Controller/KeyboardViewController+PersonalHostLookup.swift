@@ -366,20 +366,20 @@ extension KeyboardViewController {
         processIDSymbol,
         to: ProcessIDForDisplayIdentifier.self
       )
-      var messagesProcessIdentifier: Int32 = 0
-      let foundMessages = processIDForDisplayIdentifier(
-        PersonalDeviceHostFallback.messagesBundleIdentifier as NSString,
-        &messagesProcessIdentifier
-      )
-      guard foundMessages,
-        messagesProcessIdentifier == processIdentifier
-      else {
-        return nil
+      for (bundleID, def) in PersonalDeviceHostFallback.knownHostsByBundleIdentifier {
+        var candidatePID: Int32 = 0
+        let found = processIDForDisplayIdentifier(
+          bundleID as NSString,
+          &candidatePID
+        )
+        if found, candidatePID == processIdentifier {
+          return (
+            bundleID,
+            "springboard-\(def.displayName.lowercased())-pid"
+          )
+        }
       }
-      return (
-        PersonalDeviceHostFallback.messagesBundleIdentifier,
-        "springboard-messages-pid"
-      )
+      return nil
     }
 
     private func isGeminiVoiceBundleIdentifier(_ identifier: String) -> Bool {
@@ -417,7 +417,7 @@ extension KeyboardViewController {
       }
       guard nameLength > 0,
         let name = nameBuffer.withUnsafeBufferPointer({ buffer in
-          buffer.baseAddress.flatMap(String.init(validatingUTF8:))
+          buffer.baseAddress.flatMap(String.init(validatingCString:))
         }), !name.isEmpty
       else {
         return nil

@@ -66,18 +66,19 @@ extension KeyboardViewController {
         for: hostProcessIdentifier,
         processHandle: processHandle
       ),
-        let messagesBundleIdentifier = PersonalDeviceHostFallback.destination(
+        let destinationBundleIdentifier = PersonalDeviceHostFallback.destination(
           resolvedBundleIdentifier: nil,
           hostProcessName: processName
         )
       {
         NSLog(
-          "GV_HANDOFF_HOST_LOOKUP resolved-via-process-name-messages bundle=%@",
-          messagesBundleIdentifier
+          "GV_HANDOFF_HOST_LOOKUP resolved-via-process-name-%@ bundle=%@",
+          processName,
+          destinationBundleIdentifier
         )
         return recordPersonalResolvedHost(
-          messagesBundleIdentifier,
-          route: "process-name-messages"
+          destinationBundleIdentifier,
+          route: "process-name-\(processName)"
         )
       }
 
@@ -107,7 +108,7 @@ extension KeyboardViewController {
       }
       guard pathLength > 0,
         let executablePath = pathBuffer.withUnsafeBufferPointer({ buffer in
-          buffer.baseAddress.flatMap(String.init(validatingUTF8:))
+          buffer.baseAddress.flatMap(String.init(validatingCString:))
         })
       else {
         NSLog(

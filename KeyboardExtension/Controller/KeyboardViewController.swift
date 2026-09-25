@@ -18,14 +18,7 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
     static let legacyContextAfter = "keyboard.active-context-after"
   }
 
-  enum DictationMode {
-    case idle
-    case openingHost
-    case recording
-    case cancelling
-    case transcribing
-    case resultWaiting
-  }
+  typealias DictationMode = KeyboardDictationMode
 
   let store = SharedRelayStore()
   let sharedPreferences = UserDefaults(suiteName: VoiceAppGroup.identifier) ?? .standard
@@ -60,8 +53,8 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
   let typingStack = UIStackView()
   let keyboardSurface = KeyboardSurfaceView()
   let recordingPanel = UIView()
-  let waveformView = LiveWaveformView()
-  let recordingTitleLabel = UILabel()
+  let recordingCardState = KeyboardRecordingCardState()
+  var recordingHostingController: UIHostingController<KeyboardRecordingCardView>?
   var keyboardHeightConstraint: NSLayoutConstraint?
   let timerLabel = UILabel()
   let insertLatestButton = KeyboardButton(type: .system)

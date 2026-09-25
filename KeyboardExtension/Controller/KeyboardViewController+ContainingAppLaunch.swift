@@ -29,9 +29,20 @@ extension KeyboardViewController {
   /// as a plain foreground request and claims nothing.
   func openContainingAppFromBrandMark() {
     #if GEMINI_PERSONAL_DEVICE
-      guard let url = URL(string: "geminivoice://open") else { return }
+      let capturedHostProcessIdentifier = hostProcessIdentifierForHandoff()
+      let originBundleID = originatingApplicationBundleIdentifierForHandoff(
+        capturedHostProcessIdentifier: capturedHostProcessIdentifier,
+        persistUnknown: false
+      )
+      var components = URLComponents()
+      components.scheme = "geminivoice"
+      components.host = "open"
+      if let originBundleID {
+        components.queryItems = [URLQueryItem(name: "originBundleID", value: originBundleID)]
+      }
+      guard let url = components.url ?? URL(string: "geminivoice://open") else { return }
       openContainingAppURL(url) { opened in
-        NSLog("GV_BRAND_MARK_OPEN result=%@", opened ? "true" : "false")
+        NSLog("GV_BRAND_MARK_OPEN result=%@ origin=%@", opened ? "true" : "false", originBundleID ?? "nil")
       }
     #else
       // Same Guideline 4.4.1 constraint as the dictation handoff: a Release

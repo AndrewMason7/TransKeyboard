@@ -3,11 +3,11 @@ import Darwin
 import UIKit
 
 extension KeyboardViewController {
-  @objc func microphoneTapped() {
+  func microphoneTapped() {
     handleDictationTap(action: .transcribe)
   }
 
-  @objc func translateTapped() {
+  func translateTapped() {
     handleDictationTap(action: .translate)
   }
 

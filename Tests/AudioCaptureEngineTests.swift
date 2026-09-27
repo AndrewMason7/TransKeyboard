@@ -201,4 +201,32 @@ final class VoiceRelayLiveActivityOperationQueueTests: XCTestCase {
     await queue.waitUntilIdle()
     XCTAssertEqual(executedOperations, [1, 2])
   }
+
+  func testSessionInterruptionBeganCancelsActiveSegment() {
+    let capture = AudioCaptureEngine()
+    capture.isRecordingActive = true
+    let notification = Notification(
+      name: AVAudioSession.interruptionNotification,
+      object: nil,
+      userInfo: [AVAudioSessionInterruptionTypeKey: AVAudioSession.InterruptionType.began.rawValue]
+    )
+    capture.handleAudioSessionInterruption(notification)
+    XCTAssertFalse(capture.isRecordingActive)
+  }
+
+  func testSafeFinalizeRecordingDoesNotDestroySourceOnCollision() throws {
+    let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: tempDir) }
+
+    let sourceURL = tempDir.appendingPathComponent("source.wav")
+    let targetURL = tempDir.appendingPathComponent("target.wav")
+    try Data([0x01, 0x02]).write(to: sourceURL)
+    try Data([0x03, 0x04]).write(to: targetURL)
+
+    try AudioCaptureEngine.safelyMoveAndProtect(from: sourceURL, to: targetURL)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: targetURL.path))
+    let targetData = try Data(contentsOf: targetURL)
+    XCTAssertEqual(targetData, Data([0x01, 0x02]))
+  }
 }

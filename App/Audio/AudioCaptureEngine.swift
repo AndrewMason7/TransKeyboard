@@ -114,6 +114,15 @@ final class AudioCaptureEngine: @unchecked Sendable {
         self?.replaceEngineAndRecover()
       }
     )
+    observers.append(
+      center.addObserver(
+        forName: AVAudioSession.interruptionNotification,
+        object: AVAudioSession.sharedInstance(),
+        queue: .main
+      ) { [weak self] notification in
+        self?.handleAudioSessionInterruption(notification)
+      }
+    )
   }
 
   func start() throws {

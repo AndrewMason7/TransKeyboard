@@ -146,11 +146,9 @@ extension AudioCaptureEngine {
         "completed-\(action.rawValue)-\(safeTarget)-\(safeID).wav"
       )
       do {
-        try FileManager.default.moveItem(at: url, to: finalizedURL)
-        try Self.protectRecordingItem(at: finalizedURL)
+        try Self.safelyMoveAndProtect(from: url, to: finalizedURL)
       } catch {
         try? FileManager.default.removeItem(at: url)
-        try? FileManager.default.removeItem(at: finalizedURL)
         throw AudioCaptureError.secureStorageUnavailable(error.localizedDescription)
       }
 
@@ -186,6 +184,18 @@ extension AudioCaptureEngine {
         try? FileManager.default.removeItem(at: url)
       }
     }
+  }
+
+  static func safelyMoveAndProtect(
+    from sourceURL: URL,
+    to targetURL: URL,
+    fileManager: FileManager = .default
+  ) throws {
+    if fileManager.fileExists(atPath: targetURL.path) {
+      try? fileManager.removeItem(at: targetURL)
+    }
+    try fileManager.moveItem(at: sourceURL, to: targetURL)
+    try protectRecordingItem(at: targetURL, fileManager: fileManager)
   }
 
   static func protectRecordingItem(at url: URL, fileManager: FileManager = .default) throws {

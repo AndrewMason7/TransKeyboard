@@ -101,11 +101,13 @@ targets:
     platform: iOS
     sources:
       - path: Tests
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.GeminiVoiceSampleTests
+        PRODUCT_BUNDLE_IDENTIFIER: $(GEMINI_APP_BUNDLE_IDENTIFIER)Tests
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGNING_ALLOWED: NO
       configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) GEMINI_PERSONAL_DEVICE"
@@ -117,11 +119,16 @@ targets:
     platform: iOS
     sources:
       - path: UITests
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.GeminiVoiceSampleUITests
+        PRODUCT_BUNDLE_IDENTIFIER: $(GEMINI_APP_BUNDLE_IDENTIFIER)UITests
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGNING_ALLOWED: NO
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) GEMINI_PERSONAL_DEVICE"
     dependencies:
       - target: GeminiVoice
 
@@ -134,11 +141,16 @@ targets:
       - path: Shared/Keyboard
       - path: KeyboardExtension/UI
       - path: Shared
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.GeminiKeyboardPortTests
+        PRODUCT_BUNDLE_IDENTIFIER: $(GEMINI_KEYBOARD_BUNDLE_IDENTIFIER)Tests
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGNING_ALLOWED: NO
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) GEMINI_PERSONAL_DEVICE"
 
 schemes:
   GeminiVoice:

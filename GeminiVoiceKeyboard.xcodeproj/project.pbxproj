@@ -883,10 +883,12 @@
 						ProvisioningStyle = Automatic;
 					};
 					3CDBB14042DE64B20DC777EF = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 						TestTargetID = C17AFB129EF1AF599E1D351F;
 					};
 					783E0DBDB08A86B2BCF027D9 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					85CCD170A2DC264CFB4CED27 = {
@@ -898,6 +900,7 @@
 						ProvisioningStyle = Automatic;
 					};
 					DDB96F8FEA06CD79C7CD2EE7 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -1172,17 +1175,18 @@
 /* Begin XCBuildConfiguration section */
 		04F64B09490FFF325525F1E4 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C21AF0438E0898682839FE2E /* Debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGNING_ALLOWED = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.GeminiVoiceSampleUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GEMINI_APP_BUNDLE_IDENTIFIER)UITests";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) GEMINI_PERSONAL_DEVICE";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = GeminiVoice;
 			};
@@ -1211,17 +1215,18 @@
 		};
 		0708499A44E3CCE80E7ED985 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C21AF0438E0898682839FE2E /* Debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGNING_ALLOWED = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.GeminiKeyboardPortTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GEMINI_KEYBOARD_BUNDLE_IDENTIFIER)Tests";
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) GEMINI_PERSONAL_DEVICE";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -1272,16 +1277,16 @@
 		};
 		60252EB9A0B5058DDEAD1341 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BFCFF6E321EE159937108176 /* Release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGNING_ALLOWED = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.GeminiVoiceSampleTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GEMINI_APP_BUNDLE_IDENTIFIER)Tests";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/GeminiVoice.app/GeminiVoice";
@@ -1290,16 +1295,16 @@
 		};
 		68FB7702CDC55BAB7A923F7F /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C21AF0438E0898682839FE2E /* Debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGNING_ALLOWED = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.GeminiVoiceSampleTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GEMINI_APP_BUNDLE_IDENTIFIER)Tests";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) GEMINI_PERSONAL_DEVICE";
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1309,16 +1314,16 @@
 		};
 		7F752AC408F57245CC7DA936 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BFCFF6E321EE159937108176 /* Release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGNING_ALLOWED = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.GeminiKeyboardPortTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GEMINI_KEYBOARD_BUNDLE_IDENTIFIER)Tests";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1326,16 +1331,16 @@
 		};
 		8475CC999024D7E67BDB6EF2 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = BFCFF6E321EE159937108176 /* Release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGNING_ALLOWED = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.GeminiVoiceSampleUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GEMINI_APP_BUNDLE_IDENTIFIER)UITests";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = GeminiVoice;

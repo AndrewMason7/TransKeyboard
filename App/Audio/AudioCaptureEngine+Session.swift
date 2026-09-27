@@ -119,6 +119,36 @@ extension AudioCaptureEngine {
     guard shouldBeRunning else { return }
     NSLog("AUDIO_RELAY_INTERRUPTED route=%@", routeDescription)
     isRunning = false
+    isRecordingActive = false
+    if hasActiveSegment {
+      cancelSegment()
+    }
+  }
+
+  func handleAudioSessionInterruption(_ notification: Notification) {
+    guard let userInfo = notification.userInfo,
+      let rawType = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+      let type = AVAudioSession.InterruptionType(rawValue: rawType)
+    else { return }
+
+    switch type {
+    case .began:
+      NSLog("AUDIO_RELAY_INTERRUPTION_BEGAN route=%@", routeDescription)
+      isRunning = false
+      isRecordingActive = false
+      if hasActiveSegment {
+        cancelSegment()
+      }
+    case .ended:
+      let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+      let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+      NSLog("AUDIO_RELAY_INTERRUPTION_ENDED shouldResume=%d", options.contains(.shouldResume))
+      if options.contains(.shouldResume) && shouldBeRunning {
+        scheduleRecovery(reason: "audio interruption ended with shouldResume")
+      }
+    @unknown default:
+      break
+    }
   }
 
   func handleResumptionRecommendation(_ notification: Notification) {

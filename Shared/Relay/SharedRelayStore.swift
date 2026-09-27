@@ -396,6 +396,46 @@ final class SharedRelayStore: @unchecked Sendable {
     defaults.removeObject(forKey: Key.legacyLaunchRequestCreatedAt)
   }
 
+  @discardableResult
+  func withBoundedFileLock<T>(
+    url: URL,
+    timeoutMs: Int = 300,
+    operation: () -> T
+  ) -> T? {
+    if !FileManager.default.fileExists(atPath: url.path) {
+      _ = FileManager.default.createFile(atPath: url.path, contents: Data())
+    }
+    guard let handle = try? FileHandle(forUpdating: url) else {
+      return operation()
+    }
+    defer {
+      try? handle.close()
+    }
+
+    let deadline = DispatchTime.now() + .milliseconds(timeoutMs)
+    var acquired = false
+    var sleepIntervalMicroseconds: useconds_t = 1_000
+
+    while DispatchTime.now() < deadline {
+      if flock(handle.fileDescriptor, LOCK_EX | LOCK_NB) == 0 {
+        acquired = true
+        break
+      }
+      usleep(sleepIntervalMicroseconds)
+      sleepIntervalMicroseconds = min(sleepIntervalMicroseconds * 2, 20_000)
+    }
+
+    guard acquired else {
+      NSLog("SHARED_RELAY_STORE_LOCK_TIMEOUT url=%@", url.lastPathComponent)
+      return nil
+    }
+
+    defer {
+      _ = flock(handle.fileDescriptor, LOCK_UN)
+    }
+    return operation()
+  }
+
   private func withCommandLock<T>(_ operation: () -> T) -> T {
     Self.commandLock.lock()
     defer { Self.commandLock.unlock() }
@@ -405,30 +445,11 @@ final class SharedRelayStore: @unchecked Sendable {
     }
 
     let lockURL = containerURL.appendingPathComponent("relay-command.lock")
-    if !FileManager.default.fileExists(atPath: lockURL.path) {
-      _ = FileManager.default.createFile(atPath: lockURL.path, contents: Data())
-    }
-    guard let handle = try? FileHandle(forUpdating: lockURL) else {
+    let result = withBoundedFileLock(url: lockURL, timeoutMs: 300) {
+      defaults.synchronize()
       return operation()
     }
-
-    var acquired = false
-    for _ in 0..<10 {
-      if flock(handle.fileDescriptor, LOCK_EX | LOCK_NB) == 0 {
-        acquired = true
-        break
-      }
-      usleep(2_000)
-    }
-    if !acquired {
-      _ = flock(handle.fileDescriptor, LOCK_EX)
-    }
-    defer {
-      _ = flock(handle.fileDescriptor, LOCK_UN)
-      try? handle.close()
-    }
-    defaults.synchronize()
-    return operation()
+    return result ?? operation()
   }
 
   private func withResultLock<T>(_ operation: () -> T) -> T {
@@ -440,20 +461,11 @@ final class SharedRelayStore: @unchecked Sendable {
     }
 
     let lockURL = containerURL.appendingPathComponent("relay-result.lock")
-    if !FileManager.default.fileExists(atPath: lockURL.path) {
-      _ = FileManager.default.createFile(atPath: lockURL.path, contents: Data())
-    }
-    guard let handle = try? FileHandle(forUpdating: lockURL) else {
+    let result = withBoundedFileLock(url: lockURL, timeoutMs: 300) {
+      defaults.synchronize()
       return operation()
     }
-
-    _ = flock(handle.fileDescriptor, LOCK_EX)
-    defer {
-      _ = flock(handle.fileDescriptor, LOCK_UN)
-      try? handle.close()
-    }
-    defaults.synchronize()
-    return operation()
+    return result ?? operation()
   }
 
   /// `UserDefaults` is shared across related processes, so an in-process lock is
@@ -470,20 +482,11 @@ final class SharedRelayStore: @unchecked Sendable {
     }
 
     let lockURL = containerURL.appendingPathComponent("relay-launch.lock")
-    if !FileManager.default.fileExists(atPath: lockURL.path) {
-      _ = FileManager.default.createFile(atPath: lockURL.path, contents: Data())
-    }
-    guard let handle = try? FileHandle(forUpdating: lockURL) else {
+    let result = withBoundedFileLock(url: lockURL, timeoutMs: 300) {
+      defaults.synchronize()
       return operation()
     }
-
-    _ = flock(handle.fileDescriptor, LOCK_EX)
-    defer {
-      _ = flock(handle.fileDescriptor, LOCK_UN)
-      try? handle.close()
-    }
-    defaults.synchronize()
-    return operation()
+    return result ?? operation()
   }
 
   private func flush() {

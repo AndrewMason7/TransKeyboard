@@ -747,4 +747,25 @@ final class RelayProtocolTests: XCTestCase {
     XCTAssertEqual(snapshot.resultRequestID, newerRequestID)
     XCTAssertEqual(snapshot.transcript, "newer text")
   }
+
+  func testBoundedFileLockTimesOutWhenHeldExclusively() throws {
+    guard let containerURL = VoiceAppGroup.containerURL else { return }
+    let lockURL = containerURL.appendingPathComponent("test-timeout.lock")
+    _ = FileManager.default.createFile(atPath: lockURL.path, contents: Data())
+    defer { try? FileManager.default.removeItem(at: lockURL) }
+
+    let handle = try FileHandle(forUpdating: lockURL)
+    defer { try? handle.close() }
+    XCTAssertEqual(flock(handle.fileDescriptor, LOCK_EX | LOCK_NB), 0)
+
+    let testStore = SharedRelayStore(defaults: defaults)
+    var executed = false
+    let acquired = testStore.withBoundedFileLock(url: lockURL, timeoutMs: 50) {
+      executed = true
+      return "done"
+    }
+    XCTAssertNil(acquired)
+    XCTAssertFalse(executed)
+    _ = flock(handle.fileDescriptor, LOCK_UN)
+  }
 }

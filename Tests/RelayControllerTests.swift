@@ -286,4 +286,62 @@ final class RelayControllerTests: XCTestCase {
     XCTAssertEqual(controller.status, .idle)
     XCTAssertTrue(controller.statusMessage.contains("failed") || controller.statusMessage.contains("credential") || controller.statusMessage.contains("cancelled"))
   }
+
+  @MainActor
+  func testTranscriptionBackgroundExpirationMarksRecordingFailed() throws {
+    let (controller, _) = try makeController()
+    let requestID = UUID().uuidString
+    let recordingURL = directoryURL
+      .appendingPathComponent("Recordings", isDirectory: true)
+      .appendingPathComponent("completed-transcribe-en-\(requestID).wav")
+    try FileManager.default.createDirectory(
+      at: recordingURL.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try Data([0, 1, 2, 3]).write(to: recordingURL)
+    let recording = try controller.recoveryStore.stage(
+      CapturedAudioSegment(
+        requestID: requestID,
+        url: recordingURL,
+        startedAt: Date().addingTimeInterval(-2),
+        endedAt: Date()
+      ),
+      action: .transcribe,
+      translationTargetCode: "en"
+    )
+
+    controller.processingRecordingID = recording.id
+    controller.transcriptionBackgroundTimeExpired()
+
+    XCTAssertNil(controller.processingRecordingID)
+    let item = controller.recoveryStore.recordings.first { $0.id == recording.id }
+    XCTAssertEqual(item?.lastError, "Processing timed out in background — recording preserved.")
+  }
+
+  @MainActor
+  func testRetryRecordingGivesFeedbackWhenAPIKeyMissing() throws {
+    let (controller, _) = try makeController(apiKey: "")
+    let requestID = UUID().uuidString
+    let recordingURL = directoryURL
+      .appendingPathComponent("Recordings", isDirectory: true)
+      .appendingPathComponent("completed-transcribe-en-\(requestID).wav")
+    try FileManager.default.createDirectory(
+      at: recordingURL.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try Data([0, 1, 2, 3]).write(to: recordingURL)
+    let recording = try controller.recoveryStore.stage(
+      CapturedAudioSegment(
+        requestID: requestID,
+        url: recordingURL,
+        startedAt: Date().addingTimeInterval(-2),
+        endedAt: Date()
+      ),
+      action: .transcribe,
+      translationTargetCode: "en"
+    )
+
+    controller.retryRecording(recording)
+    XCTAssertEqual(controller.statusMessage, "Add a Gemini API key in Settings before retrying.")
+  }
 }

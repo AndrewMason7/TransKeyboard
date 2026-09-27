@@ -508,10 +508,14 @@ extension RelayController {
       self.endTranscriptionBackgroundTaskIfNeeded()
       if let segment = self.activeLocalAudioSegment {
         do {
-          _ = try self.recoveryStore.stage(
+          let staged = try self.recoveryStore.stage(
             segment,
             action: action,
             translationTargetCode: self.configuration.translationTarget.code
+          )
+          self.recoveryStore.markFailed(
+            id: staged.id,
+            message: error.localizedDescription
           )
           self.refreshRecoverableRecordings()
         } catch {

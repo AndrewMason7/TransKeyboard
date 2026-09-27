@@ -49,6 +49,13 @@ extension RelayController {
     transcriptionGeneration += 1
     transcriptionTask?.cancel()
     transcriptionTask = nil
+    if let recordingID = processingRecordingID {
+      recoveryStore.markFailed(
+        id: recordingID,
+        message: "Processing timed out in background — recording preserved."
+      )
+      refreshRecoverableRecordings()
+    }
     processingRequestID = nil
     processingRecordingID = nil
     recoveryRetryTask?.cancel()

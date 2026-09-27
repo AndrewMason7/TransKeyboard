@@ -26,10 +26,18 @@ extension RelayController {
     guard retryingRecordingID == nil,
       status != .recording,
       status != .transcribing,
-      recording.transcriptSaved != true,
-      configuration.hasUsableAPIKey,
-      let audioURL = recoveryStore.fileURL(for: recording)
+      recording.transcriptSaved != true
     else { return }
+
+    guard configuration.hasUsableAPIKey else {
+      statusMessage = "Add a Gemini API key in Settings before retrying."
+      return
+    }
+
+    guard let audioURL = recoveryStore.fileURL(for: recording) else {
+      statusMessage = "Audio file for this recording is missing."
+      return
+    }
 
     let retryRequestID = UUID().uuidString
     markRelayActivityAndSuspendIdleShutdown()

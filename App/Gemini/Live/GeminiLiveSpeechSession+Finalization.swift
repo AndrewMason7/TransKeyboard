@@ -56,7 +56,7 @@ extension GeminiLiveSpeechSession {
           lastLikelySpeechSentAt.map {
             boundaryInitiatedAt.timeIntervalSince($0) < 0.8
           } == true
-        try await send(Self.activityEndMessage(), over: socket)
+        try await send(Self.audioStreamEndMessage(), over: socket)
         // Snapshot only after the boundary send completes. A delayed
         // older segment delivered while the send is in flight remains
         // part of the baseline and cannot finalize the drained stream.

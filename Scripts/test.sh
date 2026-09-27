@@ -12,7 +12,20 @@ else
   echo "XcodeGen not found; using the committed Xcode project."
 fi
 
-destination="${TEST_DESTINATION:-platform=iOS Simulator,name=iPhone 17}"
+if [[ -z "${TEST_DESTINATION:-}" ]]; then
+  device_id="${GEMINI_VOICE_DEVICE_UDID:-${IPHONE_UDID:-}}"
+  if [[ -z "$device_id" ]]; then
+    detected_device="$(xcrun devicectl list devices 2>/dev/null | grep -E "iPhone" | head -n 1 | awk '{print $3}' || true)"
+    if [[ -n "$detected_device" ]]; then
+      device_id="$detected_device"
+    else
+      device_id="00008150-001943D63E13401C"
+    fi
+  fi
+  destination="platform=iOS,id=$device_id"
+else
+  destination="$TEST_DESTINATION"
+fi
 
 scheme="GeminiVoice"
 raw_output=0

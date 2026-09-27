@@ -113,9 +113,6 @@ actor GeminiLiveSpeechSession {
         )
       }
 
-      if case .transcribe = mode {
-        try await send(Self.activityStartMessage(), over: socket)
-      }
       try await flushPendingAudio(over: socket)
       isConfigured = true
     } catch {

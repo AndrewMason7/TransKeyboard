@@ -107,6 +107,23 @@ private final class EndpointCapture: @unchecked Sendable {
   }
 }
 
+private final class TextCollector: @unchecked Sendable {
+  private let lock = NSLock()
+  private var values: [String] = []
+
+  var elements: [String] {
+    lock.lock()
+    defer { lock.unlock() }
+    return values
+  }
+
+  func append(_ value: String) {
+    lock.lock()
+    defer { lock.unlock() }
+    values.append(value)
+  }
+}
+
 final class GeminiLiveSpeechSessionTests: XCTestCase {
   func testKeyboardActionsSelectTheirDedicatedLiveModes() {
     XCTAssertEqual(
@@ -119,7 +136,7 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
     )
   }
 
-  func testTranscriptionSetupUsesDocumentedLiveModelAndManualPushToTalk() throws {
+  func testTranscriptionSetupUsesDocumentedLiveModelAndAutomaticActivityDetection() throws {
     let message = GeminiLiveSpeechSession.setupMessage(for: .transcribe)
     let setup = try XCTUnwrap(message["setup"] as? [String: Any])
     XCTAssertEqual(setup["model"] as? String, "models/gemini-3.5-transcribe-live")
@@ -133,11 +150,7 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
     XCTAssertEqual(transcription["mode"] as? String, "SMART")
     XCTAssertEqual(transcription["languageCodes"] as? [String], [])
 
-    let realtime = try XCTUnwrap(setup["realtimeInputConfig"] as? [String: Any])
-    let detection = try XCTUnwrap(
-      realtime["automaticActivityDetection"] as? [String: Any]
-    )
-    XCTAssertEqual(detection["disabled"] as? Bool, true)
+    XCTAssertNil(setup["realtimeInputConfig"])
   }
 
   func testTranscriptionSetupUsesConfiguredCustomLiveModel() throws {
@@ -322,11 +335,11 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
 
     let finishTask = Task { try await session.finish() }
     for _ in 0..<100 {
-      if await socket.hasSentActivityEnd() { break }
+      if await socket.hasSentAudioStreamEnd() { break }
       try await Task.sleep(nanoseconds: 10_000_000)
     }
-    let sentActivityEnd = await socket.hasSentActivityEnd()
-    XCTAssertTrue(sentActivityEnd)
+    let sentAudioStreamEnd = await socket.hasSentAudioStreamEnd()
+    XCTAssertTrue(sentAudioStreamEnd)
 
     try await socket.enqueueJSONObject(
       [
@@ -346,16 +359,13 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
         JSONSerialization.jsonObject(with: data) as? [String: Any]
       )
     }
-    XCTAssertEqual(messages.count, 4)
+    XCTAssertEqual(messages.count, 3)
     XCTAssertNotNil(messages[0]["setup"])
     XCTAssertNotNil(
-      (messages[1]["realtimeInput"] as? [String: Any])?["activityStart"]
+      (messages[1]["realtimeInput"] as? [String: Any])?["audio"]
     )
     XCTAssertNotNil(
-      (messages[2]["realtimeInput"] as? [String: Any])?["audio"]
-    )
-    XCTAssertNotNil(
-      (messages[3]["realtimeInput"] as? [String: Any])?["activityEnd"]
+      (messages[2]["realtimeInput"] as? [String: Any])?["audioStreamEnd"]
     )
   }
 
@@ -393,11 +403,11 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
     )
     let finishTask = Task { try await session.finish() }
     for _ in 0..<100 {
-      if await socket.hasSentActivityEnd() { break }
+      if await socket.hasSentAudioStreamEnd() { break }
       try await Task.sleep(nanoseconds: 10_000_000)
     }
-    let sentActivityEnd = await socket.hasSentActivityEnd()
-    XCTAssertTrue(sentActivityEnd)
+    let sentAudioStreamEnd = await socket.hasSentAudioStreamEnd()
+    XCTAssertTrue(sentAudioStreamEnd)
 
     // The newer interim proves that a later speech segment is not final.
     try await Task.sleep(nanoseconds: 500_000_000)
@@ -459,8 +469,8 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
     // without a duplicate server event.
     let result = try await finishTask.value
     XCTAssertEqual(result, "Already finalized.")
-    let sentActivityEnd = await socket.hasSentActivityEnd()
-    XCTAssertTrue(sentActivityEnd)
+    let sentAudioStreamEnd = await socket.hasSentAudioStreamEnd()
+    XCTAssertTrue(sentAudioStreamEnd)
   }
 
   func testFinishDoesNotDropSpeechAfterAnEarlierFinalWhenInterimIsLate() async throws {
@@ -500,11 +510,11 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
 
     let finishTask = Task { try await session.finish() }
     for _ in 0..<100 {
-      if await socket.hasSentActivityEnd() { break }
+      if await socket.hasSentAudioStreamEnd() { break }
       try await Task.sleep(nanoseconds: 10_000_000)
     }
-    let sentActivityEnd = await socket.hasSentActivityEnd()
-    XCTAssertTrue(sentActivityEnd)
+    let sentAudioStreamEnd = await socket.hasSentAudioStreamEnd()
+    XCTAssertTrue(sentAudioStreamEnd)
 
     // This is deliberately beyond the old 1.5-second acceptance threshold.
     // The pre-boundary final must never win merely because time elapsed.
@@ -547,5 +557,54 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
       ),
       "Hello world. Next sentence."
     )
+    XCTAssertEqual(
+      GeminiLiveSpeechSession.mergedTranscript(
+        existing: "Hello",
+        update: "Hello"
+      ),
+      "Hello Hello"
+    )
+    XCTAssertEqual(
+      GeminiLiveSpeechSession.mergedTranscript(
+        existing: "I like apple",
+        update: "apple"
+      ),
+      "I like apple apple"
+    )
+  }
+
+  func testInterimInputCombinesWithPriorFinalizedInput() async throws {
+    let socket = MockGeminiLiveSocket()
+    try await socket.enqueueJSONObject(["setupComplete": [:]])
+    let collector = TextCollector()
+    let firstFinalReceived = expectation(description: "first final received")
+    let interimReceived = expectation(description: "interim received")
+    let session = GeminiLiveSpeechSession(
+      mode: .transcribe,
+      socketFactory: { _ in socket },
+      progressHandler: { text in
+        collector.append(text)
+        if text == "First turn." {
+          firstFinalReceived.fulfill()
+        }
+        if text == "First turn. Second turn" {
+          interimReceived.fulfill()
+        }
+      }
+    )
+
+    try await session.connect(credential: .apiKey("development-key"))
+    try await socket.enqueueJSONObject(
+      ["serverContent": ["inputTranscription": ["text": "First turn."]]]
+    )
+    await fulfillment(of: [firstFinalReceived], timeout: 2)
+
+    try await socket.enqueueJSONObject(
+      ["serverContent": ["interimInputTranscription": ["text": "Second turn"]]]
+    )
+    await fulfillment(of: [interimReceived], timeout: 2)
+
+    XCTAssertEqual(collector.elements, ["First turn.", "First turn. Second turn"])
+    await session.cancel()
   }
 }

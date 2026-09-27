@@ -125,12 +125,14 @@ extension GeminiLiveSpeechSession {
       case .setupComplete:
         setupCompleted = true
       case .interimInput(let text):
-        if case .transcribe = mode,
-          !TranscriptFormatter.cleaned(text).isEmpty
-        {
-          transcriptEventRevision += 1
-          lastInterimInputRevision = transcriptEventRevision
-          progressHandler?(text)
+        if case .transcribe = mode {
+          let cleanedInterim = TranscriptFormatter.cleaned(text)
+          if !cleanedInterim.isEmpty {
+            transcriptEventRevision += 1
+            lastInterimInputRevision = transcriptEventRevision
+            let preview = finalInputText.isEmpty ? cleanedInterim : "\(finalInputText) \(cleanedInterim)"
+            progressHandler?(preview)
+          }
         }
       case .finalInput(let text):
         guard !TranscriptFormatter.cleaned(text).isEmpty else { continue }

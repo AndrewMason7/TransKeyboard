@@ -2,6 +2,26 @@ import Foundation
 import Speech
 import AVFoundation
 
+public enum LocalSpeechTranscriberError: LocalizedError, Equatable {
+  case recognizerUnavailable
+  case permissionDenied
+  case audioInputInvalid
+  case recognitionFailed(String)
+
+  public var errorDescription: String? {
+    switch self {
+    case .recognizerUnavailable:
+      return "On-device speech recognizer is unavailable for the current language."
+    case .permissionDenied:
+      return "Speech recognition permission was not granted."
+    case .audioInputInvalid:
+      return "The microphone audio format is not supported for on-device recognition."
+    case .recognitionFailed(let details):
+      return "On-device speech recognition failed: \(details)"
+    }
+  }
+}
+
 @MainActor
 public final class LocalSpeechTranscriber: NSObject, Sendable {
   public static let pcm16Format = AVAudioFormat(
@@ -21,10 +41,14 @@ public final class LocalSpeechTranscriber: NSObject, Sendable {
   private var recognizer: SFSpeechRecognizer?
   private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
   private var recognitionTask: SFSpeechRecognitionTask?
+  private var accumulatedText: String = ""
   private var latestHypothesis: String = ""
+  private var isFinishing: Bool = false
   private var didComplete: Bool = false
   private var finishSafetyWorkItem: DispatchWorkItem?
+  private var activeProgressHandler: (@Sendable (String) -> Void)?
   private var activeCompletionHandler: (@Sendable (Result<String, Error>) -> Void)?
+  private var consecutiveErrorCount: Int = 0
 
   public static var authorizationStatus: SFSpeechRecognizerAuthorizationStatus {
     SFSpeechRecognizer.authorizationStatus()
@@ -50,18 +74,40 @@ public final class LocalSpeechTranscriber: NSObject, Sendable {
     completionHandler: @escaping @Sendable (Result<String, Error>) -> Void
   ) throws {
     guard let recognizer, recognizer.isAvailable else {
-      throw NSError(
-        domain: "LocalSpeechTranscriber",
-        code: 1,
-        userInfo: [NSLocalizedDescriptionKey: "Speech recognizer unavailable"]
-      )
+      throw LocalSpeechTranscriberError.recognizerUnavailable
     }
 
     cancel()
     isRunning = true
+    isFinishing = false
     didComplete = false
+    accumulatedText = ""
     latestHypothesis = ""
+    consecutiveErrorCount = 0
+    activeProgressHandler = progressHandler
     activeCompletionHandler = completionHandler
+
+    try startRecognitionTask()
+  }
+
+  private func combinedText(segment: String) -> String {
+    let cleanSegment = TranscriptFormatter.cleaned(segment)
+    let cleanAccumulated = TranscriptFormatter.cleaned(accumulatedText)
+    if cleanAccumulated.isEmpty { return cleanSegment }
+    guard !cleanSegment.isEmpty else { return cleanAccumulated }
+    let insertion = TranscriptFormatter.textForInsertion(cleanSegment, contextBefore: cleanAccumulated)
+    return cleanAccumulated + insertion
+  }
+
+  private func accumulate(_ segment: String) {
+    let merged = combinedText(segment: segment)
+    accumulatedText = merged
+  }
+
+  private func startRecognitionTask() throws {
+    guard let recognizer, recognizer.isAvailable else {
+      throw LocalSpeechTranscriberError.recognizerUnavailable
+    }
 
     let request = SFSpeechAudioBufferRecognitionRequest()
     request.taskHint = .dictation
@@ -76,19 +122,56 @@ public final class LocalSpeechTranscriber: NSObject, Sendable {
       Task { @MainActor [weak self] in
         guard let self, !self.didComplete else { return }
         if let result {
-          let text = result.bestTranscription.formattedString
-          self.latestHypothesis = text
-          progressHandler(text)
+          self.consecutiveErrorCount = 0
+          let segmentText = result.bestTranscription.formattedString
+          let fullText = self.combinedText(segment: segmentText)
+          self.latestHypothesis = fullText
+          self.activeProgressHandler?(fullText)
+
           if result.isFinal {
-            self.completeWithSuccess(text)
+            if self.isFinishing {
+              self.completeWithSuccess(fullText)
+            } else {
+              self.accumulate(segmentText)
+              self.restartRecognitionTask()
+            }
           }
         } else if let error {
-          if !self.latestHypothesis.isEmpty {
-            self.completeWithSuccess(self.latestHypothesis)
+          if self.isFinishing {
+            if !self.latestHypothesis.isEmpty {
+              self.completeWithSuccess(self.latestHypothesis)
+            } else {
+              self.completeWithError(error)
+            }
           } else {
-            self.completeWithError(error)
+            self.consecutiveErrorCount += 1
+            if self.consecutiveErrorCount > 3 {
+              if !self.latestHypothesis.isEmpty {
+                self.completeWithSuccess(self.latestHypothesis)
+              } else {
+                self.completeWithError(error)
+              }
+            } else {
+              self.restartRecognitionTask()
+            }
           }
         }
+      }
+    }
+  }
+
+  private func restartRecognitionTask() {
+    guard isRunning, !isFinishing, !didComplete else { return }
+    recognitionTask?.cancel()
+    recognitionTask = nil
+    recognitionRequest = nil
+    do {
+      try startRecognitionTask()
+    } catch {
+      if !latestHypothesis.isEmpty {
+        completeWithSuccess(latestHypothesis)
+      } else {
+        completeWithError(error)
       }
     }
   }
@@ -97,12 +180,14 @@ public final class LocalSpeechTranscriber: NSObject, Sendable {
     guard !didComplete else { return }
     didComplete = true
     isRunning = false
+    isFinishing = false
     finishSafetyWorkItem?.cancel()
     finishSafetyWorkItem = nil
     recognitionRequest = nil
     recognitionTask = nil
     let handler = activeCompletionHandler
     activeCompletionHandler = nil
+    activeProgressHandler = nil
     handler?(.success(text))
   }
 
@@ -110,17 +195,19 @@ public final class LocalSpeechTranscriber: NSObject, Sendable {
     guard !didComplete else { return }
     didComplete = true
     isRunning = false
+    isFinishing = false
     finishSafetyWorkItem?.cancel()
     finishSafetyWorkItem = nil
     recognitionRequest = nil
     recognitionTask = nil
     let handler = activeCompletionHandler
     activeCompletionHandler = nil
+    activeProgressHandler = nil
     handler?(.failure(error))
   }
 
   public func appendAudioData(_ data: Data) {
-    guard isRunning, let request = recognitionRequest, let format = Self.pcm16Format else { return }
+    guard isRunning, !isFinishing, let request = recognitionRequest, let format = Self.pcm16Format else { return }
     let frameCount = UInt32(data.count / MemoryLayout<Int16>.size)
     guard frameCount > 0, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
     buffer.frameLength = frameCount
@@ -134,9 +221,10 @@ public final class LocalSpeechTranscriber: NSObject, Sendable {
   }
 
   public func finish() {
-    guard isRunning else { return }
-    recognitionRequest?.endAudio()
+    guard isRunning, !isFinishing else { return }
+    isFinishing = true
     isRunning = false
+    recognitionRequest?.endAudio()
     finishSafetyWorkItem?.cancel()
     let workItem = DispatchWorkItem { [weak self] in
       guard let self, !self.didComplete else { return }
@@ -164,7 +252,12 @@ public final class LocalSpeechTranscriber: NSObject, Sendable {
     recognitionTask = nil
     recognitionRequest = nil
     activeCompletionHandler = nil
+    activeProgressHandler = nil
     isRunning = false
+    isFinishing = false
     didComplete = true
+    accumulatedText = ""
+    latestHypothesis = ""
+    consecutiveErrorCount = 0
   }
 }

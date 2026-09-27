@@ -107,4 +107,18 @@ final class RecoverableRecordingStoreTests: XCTestCase {
       "Connection failed — recording saved. Retry in Gemini Voice."
     )
   }
+
+  func testKeyboardMessageReflectsMissingOrInvalidAPIKey() {
+    let missingKeyError = GeminiTranscriptionError.missingAPIKey
+    let msg1 = RecoverableRecordingStatus.keyboardMessage(for: missingKeyError)
+    XCTAssertEqual(msg1, "Add a Gemini API key in Gemini Voice Settings.")
+
+    let authError = GeminiTranscriptionError.service(statusCode: 401, message: "API key not valid")
+    let msg2 = RecoverableRecordingStatus.keyboardMessage(for: authError)
+    XCTAssertEqual(msg2, "Invalid Gemini API key — update in Gemini Voice.")
+
+    let quotaError = GeminiTranscriptionError.service(statusCode: 429, message: "Resource exhausted")
+    let msg3 = RecoverableRecordingStatus.keyboardMessage(for: quotaError)
+    XCTAssertEqual(msg3, "Gemini rate limit exceeded — retry shortly.")
+  }
 }

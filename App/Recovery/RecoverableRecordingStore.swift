@@ -260,6 +260,24 @@ enum RecoverableRecordingStoreError: LocalizedError {
 
 enum RecoverableRecordingStatus {
   static func keyboardMessage(for error: Error) -> String {
+    if let transcriptionError = error as? GeminiTranscriptionError {
+      switch transcriptionError {
+      case .missingAPIKey:
+        return "Add a Gemini API key in Gemini Voice Settings."
+      case .service(let statusCode, _):
+        switch statusCode {
+        case 401, 403:
+          return "Invalid Gemini API key — update in Gemini Voice."
+        case 429:
+          return "Gemini rate limit exceeded — retry shortly."
+        default:
+          break
+        }
+      default:
+        break
+      }
+    }
+
     let nsError = error as NSError
     if nsError.domain == NSURLErrorDomain {
       switch nsError.code {

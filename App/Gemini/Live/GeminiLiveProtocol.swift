@@ -36,9 +36,6 @@ extension GeminiLiveSpeechSession {
           "generationConfig": [
             "responseModalities": ["TEXT"]
           ],
-          "realtimeInputConfig": [
-            "automaticActivityDetection": ["disabled": true]
-          ],
           "inputAudioTranscription": [
             "languageCodes": [],
             "mode": "SMART",
@@ -117,9 +114,9 @@ extension GeminiLiveSpeechSession {
     let next = TranscriptFormatter.cleaned(update)
     guard !next.isEmpty else { return current }
     guard !current.isEmpty else { return next }
-    if next == current || current.hasSuffix(next) { return current }
-    if next.hasPrefix(current) { return next }
-    return TranscriptFormatter.cleaned(current + " " + next)
+    if next != current, next.hasPrefix(current) { return next }
+    let insertion = TranscriptFormatter.textForInsertion(next, contextBefore: current)
+    return TranscriptFormatter.cleaned(current + insertion)
   }
 
   static func activityStartMessage() -> [String: Any] {

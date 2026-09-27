@@ -185,8 +185,33 @@ extension RelayController {
     activeLiveSession = liveSession
     lastLivePreviewAt = .distantPast
     let apiKey = configuration.apiKey
-    liveConnectionTask = Task {
-      try await liveSession.connect(credential: .apiKey(apiKey))
+    liveConnectionTask = Task { [weak self, weak liveSession] in
+      do {
+        try await liveSession?.connect(credential: .apiKey(apiKey))
+      } catch {
+        Task { @MainActor [weak self] in
+          guard let self, self.activeRequestID == requestID else { return }
+          NSLog("LIVE_CONNECTION_EARLY_FAILURE request=%@ error=%@", requestID, error.localizedDescription)
+          self.cancelLiveStream(matching: requestID)
+          if self.configuration.hasUsableAPIKey {
+            self.publish(
+              .recording,
+              message: "Live stream unavailable — recording for Gemini fallback…",
+              activeRequestID: requestID,
+              activeDictationAction: action,
+              recordingStartedAt: self.activeStartedAt
+            )
+          } else {
+            self.publish(
+              .error,
+              message: "Gemini Live connection failed: \(error.localizedDescription)",
+              activeRequestID: requestID,
+              activeDictationAction: action
+            )
+            self.cancelDictation(message: "Connection failed: \(error.localizedDescription)")
+          }
+        }
+      }
     }
 
     let chunkHandler: @Sendable (Data) -> Void = { data in

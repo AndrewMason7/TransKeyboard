@@ -2,10 +2,12 @@ import Foundation
 import Security
 
 struct GeminiCredentialStore {
-  private var service: String {
-    "\(Bundle.main.bundleIdentifier ?? "com.example.GeminiVoiceSample").credentials"
-  }
+  private let service: String
   private let account = "gemini-api-key"
+
+  init(service: String? = nil) {
+    self.service = service ?? "\(Bundle.main.bundleIdentifier ?? "com.example.GeminiVoiceSample").credentials"
+  }
 
   func loadAPIKey() -> String {
     let query: [String: Any] = [

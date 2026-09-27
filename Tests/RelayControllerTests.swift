@@ -1,3 +1,4 @@
+import AVFoundation
 import UIKit
 import XCTest
 
@@ -117,21 +118,23 @@ final class RelayControllerTests: XCTestCase {
   }
 
   @MainActor
-  private func makeController() throws -> (RelayController, SharedRelayStore) {
-    let bundleURL = directoryURL.appendingPathComponent("TestConfiguration.bundle")
+  private func makeController(apiKey: String = "test-api-key") throws -> (RelayController, SharedRelayStore) {
+    let bundleURL = directoryURL.appendingPathComponent("TestConfiguration-\(UUID().uuidString).bundle")
     try FileManager.default.createDirectory(at: bundleURL, withIntermediateDirectories: true)
     let bundleInfo = try PropertyListSerialization.data(
       fromPropertyList: [
         "CFBundleIdentifier": "com.example.GeminiVoiceSample.TestConfiguration",
-        "GeminiDefaultAPIKey": "test-api-key",
+        "GeminiDefaultAPIKey": apiKey,
       ],
       format: .xml,
       options: 0
     )
     try bundleInfo.write(to: bundleURL.appendingPathComponent("Info.plist"), options: .atomic)
+    let credentialStore = GeminiCredentialStore(service: "test-service-\(UUID().uuidString)")
     let configuration = AppConfiguration(
       defaults: defaults,
-      bundle: try XCTUnwrap(Bundle(url: bundleURL))
+      bundle: try XCTUnwrap(Bundle(url: bundleURL)),
+      credentialStore: credentialStore
     )
     let store = SharedRelayStore(defaults: defaults)
     store.resetForTesting()
@@ -265,5 +268,22 @@ final class RelayControllerTests: XCTestCase {
     controller.configuration.autoStartRelayOnLaunch = false
     await controller.applicationDidBecomeActive()
     XCTAssertFalse(controller.isRelayRunning)
+  }
+
+  @MainActor
+  func testDictationAbortsImmediatelyWhenLiveConnectionFailsWithoutUsableKey() async throws {
+    let (controller, _) = try makeController(apiKey: "")
+    controller.configuration.speechEngineMode = .geminiLive
+    controller.isRelayRunning = true
+    controller.capture.isRunning = true
+    controller.capture.inputFormat = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)
+    controller.setLocalStatus(.idle, message: "Ready")
+
+    controller.beginDictation(requestID: "req-fail-fast", action: .transcribe)
+    // Wait briefly for Task to run
+    try await Task.sleep(nanoseconds: 150_000_000)
+
+    XCTAssertEqual(controller.status, .idle)
+    XCTAssertTrue(controller.statusMessage.contains("failed") || controller.statusMessage.contains("credential") || controller.statusMessage.contains("cancelled"))
   }
 }

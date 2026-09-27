@@ -76,7 +76,7 @@ extension AudioCaptureEngine {
       throw AudioCaptureError.invalidInputFormat
     }
 
-    try input.installTap(onBus: 0, bufferSize: 2_048, format: format) { [weak self] buffer, _ in
+    input.installTap(onBus: 0, bufferSize: 2_048, format: format) { [weak self] buffer, _ in
       self?.write(buffer)
     }
     tapInstalled = true

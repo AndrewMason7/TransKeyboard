@@ -55,6 +55,13 @@ extension RelayController {
   func scheduleIdleShutdownIfEligible() {
     idleShutdownWorkItem?.cancel()
     idleShutdownWorkItem = nil
+
+    let idleTimeout = configuration.relayIdleTimeout
+    guard let timeoutInterval = idleTimeout.timeInterval else {
+      // Idle timeout is "Never" — do not schedule auto-stop
+      return
+    }
+
     let operationIsBusy =
       status.isBusy
       || activeRequestID != nil
@@ -65,7 +72,8 @@ extension RelayController {
         operationIsBusy: operationIsBusy,
         hasPendingHandoff: pendingLaunchRequest != nil
           || store.pendingLaunchRequest() != nil,
-        hasPendingCommand: false
+        hasPendingCommand: false,
+        timeoutSeconds: idleTimeout.rawSeconds
       )
     else { return }
 
@@ -74,13 +82,16 @@ extension RelayController {
     }
     idleShutdownWorkItem = workItem
     DispatchQueue.main.asyncAfter(
-      deadline: .now() + RelayIdleShutdownPolicy.timeout,
+      deadline: .now() + timeoutInterval,
       execute: workItem
     )
   }
 
   func idleShutdownDeadlineReached() {
     idleShutdownWorkItem = nil
+    let idleTimeout = configuration.relayIdleTimeout
+    guard idleTimeout.rawSeconds > 0 else { return }
+
     let operationIsBusy =
       status.isBusy
       || activeRequestID != nil
@@ -100,11 +111,12 @@ extension RelayController {
         operationIsBusy: operationIsBusy,
         hasPendingHandoff: pendingLaunchRequest != nil
           || store.pendingLaunchRequest() != nil,
-        hasPendingCommand: false
+        hasPendingCommand: false,
+        timeoutSeconds: idleTimeout.rawSeconds
       )
     else { return }
     stopRelay(
-      message: "Relay paused after 2 minutes — tap Dictate to restart",
+      message: "Relay paused after \(idleTimeout.formattedDuration) — tap Dictate to restart",
       offlineReason: .idleTimeout
     )
   }

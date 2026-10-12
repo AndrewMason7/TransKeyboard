@@ -97,7 +97,7 @@ final class RelayControllerLocalDictationTests: XCTestCase {
     let transcriber = LocalSpeechTranscriber()
     transcriber.requiresOnDeviceRecognition = true
 
-    let controller = RelayController(
+    _ = RelayController(
       configuration: configuration,
       localTranscriber: transcriber
     )
@@ -106,7 +106,7 @@ final class RelayControllerLocalDictationTests: XCTestCase {
     XCTAssertTrue(transcriber.requiresOnDeviceRecognition)
 
     // Simulate beginDictation configuration
-    let isAppleSpeech = (configuration.speechEngineMode == .appleSpeech)
+    XCTAssertTrue(configuration.speechEngineMode == .appleSpeech)
     transcriber.requiresOnDeviceRecognition = (configuration.speechEngineMode == .localOnDevice)
     XCTAssertFalse(transcriber.requiresOnDeviceRecognition, "Apple Speech API mode should allow on-device and server recognition fallback")
   }

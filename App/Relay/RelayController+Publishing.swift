@@ -35,7 +35,8 @@ extension RelayController {
         action: activeDictationAction,
         recordingStartedAt: recordingStartedAt,
         controlToken: controlToken,
-        relaySessionID: relaySessionID
+        relaySessionID: relaySessionID,
+        idleTimeout: configuration.relayIdleTimeout
       )
     }
     if status == .idle, pendingLaunchRequest != nil {

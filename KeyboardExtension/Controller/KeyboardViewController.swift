@@ -72,6 +72,7 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
     restoreTrackedRequest()
     keyboardSurface.delegate = self
     buildInterface()
+    updateActionVisibility()
 
     registerForTraitChanges(
       [UITraitHorizontalSizeClass.self, UITraitVerticalSizeClass.self]
@@ -120,6 +121,7 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
     inputView?.isOpaque = false
     view.superview?.backgroundColor = .clear
     view.superview?.isOpaque = false
+    updateActionVisibility()
     syncKeyboardSurfaceContext()
     updateAutomaticCapitalization()
   }

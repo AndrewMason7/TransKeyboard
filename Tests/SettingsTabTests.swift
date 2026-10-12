@@ -68,6 +68,24 @@ final class SettingsTabTests: XCTestCase {
     XCTAssertNotNil(section.body)
   }
 
+  func testTranslationSectionRendersDisabled() {
+    let config = AppConfiguration()
+    config.isTranslationEnabled = false
+    let section = TranslationSection(configuration: config)
+    XCTAssertNotNil(section.body)
+  }
+
+  func testTranslationTogglePersistsInConfiguration() {
+    let config = AppConfiguration()
+    XCTAssertTrue(config.isTranslationEnabled)
+
+    config.isTranslationEnabled = false
+    XCTAssertFalse(config.isTranslationEnabled)
+
+    config.isTranslationEnabled = true
+    XCTAssertTrue(config.isTranslationEnabled)
+  }
+
   func testRelayLifecycleSectionRenders() {
     let config = AppConfiguration()
     let section = RelayLifecycleSection(configuration: config)
@@ -79,6 +97,34 @@ final class SettingsTabTests: XCTestCase {
     config.autoStopRelayOnBackground = true
     let section = RelayLifecycleSection(configuration: config)
     XCTAssertNotNil(section.body)
+  }
+
+  func testRelayLifecycleSectionWithCustomAndNeverIdleTimeout() {
+    let config = AppConfiguration()
+    config.relayIdleTimeout = .never
+    let neverSection = RelayLifecycleSection(configuration: config)
+    XCTAssertNotNil(neverSection.body)
+
+    config.relayIdleTimeout = RelayIdleTimeout(rawSeconds: 420)
+    let customSection = RelayLifecycleSection(configuration: config)
+    XCTAssertNotNil(customSection.body)
+  }
+
+  func testRelayIdleTimeoutPersistsInConfiguration() {
+    let config = AppConfiguration()
+    XCTAssertEqual(config.relayIdleTimeout.rawSeconds, 120)
+
+    var notificationFired = false
+    config.onRelayIdleTimeoutChanged = {
+      notificationFired = true
+    }
+
+    config.relayIdleTimeoutSeconds = 300
+    XCTAssertEqual(config.relayIdleTimeout.rawSeconds, 300)
+    XCTAssertTrue(notificationFired)
+
+    config.relayIdleTimeout = .never
+    XCTAssertTrue(config.relayIdleTimeout.isNever)
   }
 
   func testCredentialsSectionRenders() {

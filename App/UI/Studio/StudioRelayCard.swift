@@ -29,7 +29,9 @@ struct StudioRelayCard: View {
 
         if relay.isRelayRunning {
           Text(
-            "Microphone session is armed. When dictating from your keyboard, audio streams live. Turns off automatically after 10 minutes without dictation."
+            configuration.relayIdleTimeout.isNever
+              ? "Microphone session is armed. When dictating from your keyboard, audio streams live. Stays on until manually stopped."
+              : "Microphone session is armed. When dictating from your keyboard, audio streams live. Turns off automatically after \(configuration.relayIdleTimeout.formattedDuration) without dictation."
           )
           .font(.caption)
           .foregroundStyle(.tertiary)

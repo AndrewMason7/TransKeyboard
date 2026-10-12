@@ -41,6 +41,12 @@ struct KeyboardToolbarView: View {
             badgeText: state.targetLanguage.code.uppercased(),
             action: { state.onTranslateTap?() }
           )
+          .transition(
+            .asymmetric(
+              insertion: .scale(scale: 0.6).combined(with: .opacity),
+              removal: .scale(scale: 0.6).combined(with: .opacity)
+            )
+          )
         }
 
         // Cancel Button (Animated in/out)

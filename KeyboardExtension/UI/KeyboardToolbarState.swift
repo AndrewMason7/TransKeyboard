@@ -78,6 +78,7 @@ final class KeyboardToolbarState {
     activeAction: RelayDictationAction?,
     isMicrophoneEnabled: Bool? = nil,
     isTranslateEnabled: Bool? = nil,
+    isTranslateHidden: Bool? = nil,
     isCancelEnabled: Bool? = nil,
     timerText: String? = nil
   ) {
@@ -89,6 +90,9 @@ final class KeyboardToolbarState {
     }
     if let isTranslateEnabled, self.isTranslateEnabled != isTranslateEnabled {
       self.isTranslateEnabled = isTranslateEnabled
+    }
+    if let isTranslateHidden, self.isTranslateHidden != isTranslateHidden {
+      self.isTranslateHidden = isTranslateHidden
     }
     if let isCancelEnabled, self.isCancelEnabled != isCancelEnabled {
       self.isCancelEnabled = isCancelEnabled

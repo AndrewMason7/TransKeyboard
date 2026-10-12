@@ -99,4 +99,26 @@ final class KeyboardRecordingCardTests: XCTestCase {
     )
     XCTAssertNotNil(card.body)
   }
+
+  func testToolbarStateTranslationHiddenToggle() {
+    let toolbarState = KeyboardToolbarState()
+    XCTAssertFalse(toolbarState.isTranslateHidden)
+
+    toolbarState.isTranslateHidden = true
+    XCTAssertTrue(toolbarState.isTranslateHidden)
+
+    toolbarState.applySync(
+      mode: .idle,
+      activeAction: nil,
+      isTranslateHidden: false
+    )
+    XCTAssertFalse(toolbarState.isTranslateHidden)
+
+    toolbarState.applySync(
+      mode: .idle,
+      activeAction: nil,
+      isTranslateHidden: true
+    )
+    XCTAssertTrue(toolbarState.isTranslateHidden)
+  }
 }

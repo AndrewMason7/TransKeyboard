@@ -6,11 +6,13 @@ import Observation
 final class AppConfiguration {
   enum Key {
     static let apiKeyOverride = "configuration.gemini-api-key-override"
+    static let translationEnabled = TranslationPreferenceKey.enabled
     static let translationTargetCode = TranslationPreferenceKey.targetCode
     static let speechEngineMode = SpeechEngineMode.sharedDefaultsKey
     static let activeModelIdentifier = SpeechEngineMode.activeModelIdentifierKey
     static let autoStartRelayOnLaunch = "configuration.auto-start-relay-on-launch"
     static let autoStopRelayOnBackground = "configuration.auto-stop-relay-on-background"
+    static let relayIdleTimeout = "configuration.relay-idle-timeout-seconds"
     static let liveTranscriptionModel = "configuration.live-transcription-model"
     static let didMigrateToBatchDefault = "configuration.did-migrate-to-batch-default-v1"
   }
@@ -122,6 +124,15 @@ final class AppConfiguration {
 
   private(set) var credentialPersistenceWarning: String?
 
+  var isTranslationEnabled: Bool {
+    didSet {
+      defaults.set(isTranslationEnabled, forKey: Key.translationEnabled)
+      sharedDefaults.set(isTranslationEnabled, forKey: Key.translationEnabled)
+      sharedDefaults.synchronize()
+      SharedRelayStore.postDarwinStateNotification()
+    }
+  }
+
   var translationTargetCode: String {
     didSet {
       let resolved = TranslationLanguage.language(for: translationTargetCode)
@@ -145,6 +156,22 @@ final class AppConfiguration {
       defaults.set(autoStopRelayOnBackground, forKey: Key.autoStopRelayOnBackground)
     }
   }
+
+  var relayIdleTimeoutSeconds: Int {
+    didSet {
+      defaults.set(relayIdleTimeoutSeconds, forKey: Key.relayIdleTimeout)
+      sharedDefaults.set(relayIdleTimeoutSeconds, forKey: Key.relayIdleTimeout)
+      sharedDefaults.synchronize()
+      onRelayIdleTimeoutChanged?()
+    }
+  }
+
+  var relayIdleTimeout: RelayIdleTimeout {
+    get { RelayIdleTimeout(rawSeconds: relayIdleTimeoutSeconds) }
+    set { relayIdleTimeoutSeconds = newValue.rawSeconds }
+  }
+
+  @ObservationIgnored var onRelayIdleTimeoutChanged: (() -> Void)?
 
   init(
     defaults: UserDefaults = .standard,
@@ -194,6 +221,18 @@ final class AppConfiguration {
     self.autoStartRelayOnLaunch = defaults.object(forKey: Key.autoStartRelayOnLaunch) as? Bool ?? true
     self.autoStopRelayOnBackground = defaults.object(forKey: Key.autoStopRelayOnBackground) as? Bool ?? false
 
+    let savedTranslationEnabled =
+      defaults.object(forKey: Key.translationEnabled) as? Bool
+      ?? resolvedSharedDefaults.object(forKey: Key.translationEnabled) as? Bool
+      ?? true
+    self.isTranslationEnabled = savedTranslationEnabled
+
+    let savedIdleTimeoutSeconds =
+      defaults.object(forKey: Key.relayIdleTimeout) as? Int
+      ?? resolvedSharedDefaults.object(forKey: Key.relayIdleTimeout) as? Int
+      ?? RelayIdleTimeout.defaultTimeout.rawSeconds
+    self.relayIdleTimeoutSeconds = savedIdleTimeoutSeconds
+
     let savedTargetCode =
       defaults.string(forKey: Key.translationTargetCode)
       ?? resolvedSharedDefaults.string(forKey: Key.translationTargetCode)
@@ -225,6 +264,10 @@ final class AppConfiguration {
       defaults.removeObject(forKey: Key.apiKeyOverride)
     }
     resolvedSharedDefaults.set(self.translationTargetCode, forKey: Key.translationTargetCode)
+    resolvedSharedDefaults.set(self.isTranslationEnabled, forKey: Key.translationEnabled)
+    resolvedSharedDefaults.set(self.relayIdleTimeoutSeconds, forKey: Key.relayIdleTimeout)
+    defaults.set(self.isTranslationEnabled, forKey: Key.translationEnabled)
+    defaults.set(self.relayIdleTimeoutSeconds, forKey: Key.relayIdleTimeout)
     resolvedSharedDefaults.synchronize()
   }
 

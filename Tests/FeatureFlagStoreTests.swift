@@ -9,18 +9,18 @@ final class FeatureFlagStoreTests: XCTestCase {
   private var store: FeatureFlagStore!
   private let suiteName = "test.featureflags.\(UUID().uuidString)"
 
-  override func setUp() {
-    super.setUp()
+  override func setUp() async throws {
+    try await super.setUp()
     testDefaults = UserDefaults(suiteName: suiteName)!
     testDefaults.removePersistentDomain(forName: suiteName)
     store = FeatureFlagStore(defaults: testDefaults)
   }
 
-  override func tearDown() {
+  override func tearDown() async throws {
     testDefaults.removePersistentDomain(forName: suiteName)
     testDefaults = nil
     store = nil
-    super.tearDown()
+    try await super.tearDown()
   }
 
   func testFeatureFlagMetadataIsComplete() {

@@ -37,7 +37,10 @@ extension KeyboardViewController {
   }
 
   var keyboardTranslationEnabled: Bool {
-    true
+    if let value = sharedPreferences.object(forKey: TranslationPreferenceKey.enabled) as? Bool {
+      return value
+    }
+    return true
   }
 
   var keyboardTranslationTarget: TranslationLanguage {
@@ -78,7 +81,7 @@ extension KeyboardViewController {
 
   func updateActionVisibility() {
     toolbarState.isCancelHidden = (mode == .idle)
-    toolbarState.isTranslateHidden = false
+    toolbarState.isTranslateHidden = !keyboardTranslationEnabled
   }
 
   func updateCancelAccessibility() {

@@ -6,15 +6,17 @@ import Observation
 import UIKit
 
 enum RelayIdleShutdownPolicy {
-  static let timeout: TimeInterval = 10 * 60
+  static var timeout: TimeInterval { 120 }
 
   static func canStop(
     relayIsRunning: Bool,
     operationIsBusy: Bool,
     hasPendingHandoff: Bool,
-    hasPendingCommand: Bool
+    hasPendingCommand: Bool,
+    timeoutSeconds: Int = 120
   ) -> Bool {
-    relayIsRunning
+    guard timeoutSeconds > 0 else { return false }
+    return relayIsRunning
       && !operationIsBusy
       && !hasPendingHandoff
       && !hasPendingCommand
@@ -131,6 +133,9 @@ final class RelayController {
     self.localTranscriber = localTranscriber
     history = historyStore.items
     recoverableRecordings = recoveryStore.recordings
+    self.configuration.onRelayIdleTimeoutChanged = { [weak self] in
+      self?.scheduleIdleShutdownIfEligible()
+    }
 
     // FIX #H4.1 (per Tyler): Throttle level updates when idle to eliminate 20fps SwiftUI redraws
     capture.levelHandler = { [weak self] level in

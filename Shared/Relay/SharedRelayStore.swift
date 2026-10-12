@@ -57,6 +57,14 @@ final class SharedRelayStore: @unchecked Sendable {
     )
   }
 
+  static func postDarwinStateNotification() {
+    postDarwinNotification(darwinStateNotificationName)
+  }
+
+  static func postDarwinCommandNotification() {
+    postDarwinNotification(darwinCommandNotificationName)
+  }
+
   private static let launchRequestLock = NSLock()
   private static let commandLock = NSLock()
   private static let resultLock = NSLock()

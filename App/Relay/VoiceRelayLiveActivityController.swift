@@ -42,7 +42,8 @@ final class VoiceRelayLiveActivityController {
     action: RelayDictationAction? = nil,
     recordingStartedAt: Date? = nil,
     controlToken: String,
-    relaySessionID: String
+    relaySessionID: String,
+    idleTimeout: RelayIdleTimeout = .defaultTimeout
   ) {
     guard FeatureFlagStore.shared[.liveActivity] else {
       if activityID != nil {
@@ -56,7 +57,8 @@ final class VoiceRelayLiveActivityController {
       message: message,
       action: action,
       recordingStartedAt: recordingStartedAt,
-      controlToken: controlToken
+      controlToken: controlToken,
+      idleTimeout: idleTimeout
     )
 
     operationQueue.enqueue { [weak self] in
@@ -136,7 +138,8 @@ final class VoiceRelayLiveActivityController {
     message: String,
     action: RelayDictationAction?,
     recordingStartedAt: Date?,
-    controlToken: String
+    controlToken: String,
+    idleTimeout: RelayIdleTimeout = .defaultTimeout
   ) -> VoiceRelayActivityAttributes.ContentState {
     switch status {
     case .recording:
@@ -164,10 +167,13 @@ final class VoiceRelayLiveActivityController {
         controlToken: controlToken
       )
     case .idle:
+      let idleSubtitle = idleTimeout.isNever
+        ? "Microphone ready · stays armed"
+        : "Microphone ready · pauses after \(idleTimeout.formattedDuration)"
       return VoiceRelayActivityAttributes.ContentState(
         phase: .standingBy,
         title: "Standing by",
-        subtitle: "Microphone ready · pauses after 2 minutes",
+        subtitle: idleSubtitle,
         recordingStartedAt: nil,
         controlToken: controlToken
       )

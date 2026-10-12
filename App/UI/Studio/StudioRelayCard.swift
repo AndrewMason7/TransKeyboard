@@ -29,22 +29,44 @@ struct StudioRelayCard: View {
 
         if relay.isRelayRunning {
           Text(
-            "Microphone session is armed. When dictating from your keyboard, audio streams live to Gemini. Turns off automatically after 2 minutes without dictation."
+            "Microphone session is armed. When dictating from your keyboard, audio streams live. Turns off automatically after 10 minutes without dictation."
           )
           .font(.caption)
           .foregroundStyle(.tertiary)
           .fixedSize(horizontal: false, vertical: true)
           .padding(.top, 2)
         }
+
+        if !configuration.hasUsableAPIKey && configuration.speechEngineMode != .appleSpeech && configuration.speechEngineMode != .localOnDevice {
+          Button {
+            configuration.selectedModelId = AppConfiguration.appleSpeechModelIdentifier
+            Task { await relay.startRelay() }
+          } label: {
+            HStack(spacing: 6) {
+              Image(systemName: "apple.logo")
+              Text("Switch to Apple Speech (Offline • No Key Needed)")
+                .font(.caption.weight(.semibold))
+            }
+            .padding(.vertical, 7)
+            .padding(.horizontal, 12)
+            .background(GeminiVoiceTheme.accentColor.opacity(0.12))
+            .foregroundStyle(GeminiVoiceTheme.accentColor)
+            .clipShape(Capsule())
+          }
+          .buttonStyle(.plain)
+          .padding(.top, 4)
+        }
       }
 
       // Live waveform visualizer right inside the relay card
-      StudioLiveWaveformView(
-        audioLevel: relay.audioLevel,
-        isLive: relay.status == .recording || relay.isRelayRunning
-      )
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, 4)
+      if FeatureFlagStore.shared[.waveformVisualizer] {
+        StudioLiveWaveformView(
+          audioLevel: relay.audioLevel,
+          isLive: relay.status == .recording || relay.isRelayRunning
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 4)
+      }
 
       // Primary tactile relay button
       Button(action: toggleRelayState) {

@@ -141,13 +141,23 @@ struct CredentialsSection: View {
         Label(
           configuration.hasUsableAPIKey
             ? "Personal-device credential configured"
-            : "API credential missing",
+            : (configuration.speechEngineMode == .appleSpeech || configuration.speechEngineMode == .localOnDevice)
+              ? "Not needed for \(configuration.speechEngineMode.shortName)"
+              : "API credential required for cloud models",
           systemImage: configuration.hasUsableAPIKey
             ? "checkmark.shield.fill"
-            : "exclamationmark.triangle.fill"
+            : (configuration.speechEngineMode == .appleSpeech || configuration.speechEngineMode == .localOnDevice)
+              ? "checkmark.circle.fill"
+              : "exclamationmark.triangle.fill"
         )
         .font(.caption)
-        .foregroundStyle(configuration.hasUsableAPIKey ? Color.green : Color.orange)
+        .foregroundStyle(
+          configuration.hasUsableAPIKey
+            ? Color.green
+            : (configuration.speechEngineMode == .appleSpeech || configuration.speechEngineMode == .localOnDevice)
+              ? Color.secondary
+              : Color.orange
+        )
 
         Spacer()
 

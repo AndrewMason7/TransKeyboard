@@ -4,7 +4,11 @@ extension GeminiLiveSpeechSession {
   var selectedFinalText: String {
     switch mode {
     case .transcribe:
-      return TranscriptFormatter.cleaned(finalInputText)
+      let base = TranscriptFormatter.cleaned(finalInputText)
+      if !currentInterimInputText.isEmpty {
+        return Self.mergedTranscript(existing: base, update: currentInterimInputText)
+      }
+      return base
     case .translate:
       return TranscriptFormatter.cleaned(finalOutputText)
     }
@@ -71,7 +75,7 @@ extension GeminiLiveSpeechSession {
   func sendAudio(_ data: Data, over socket: any GeminiLiveSocket) async throws {
     try await send(Self.audioMessage(data), over: socket)
     if Self.containsLikelySpeech(data) {
-      lastLikelySpeechSentAt = Date()
+      lastLikelySpeechSentAt = now()
     }
   }
 
@@ -130,20 +134,49 @@ extension GeminiLiveSpeechSession {
           if !cleanedInterim.isEmpty {
             transcriptEventRevision += 1
             lastInterimInputRevision = transcriptEventRevision
-            let preview = finalInputText.isEmpty ? cleanedInterim : "\(finalInputText) \(cleanedInterim)"
+            let currentTime = now()
+            let timeSinceLastInterim = lastInterimInputAt.map { currentTime.timeIntervalSince($0) }
+            lastInterimInputAt = currentTime
+
+            if !currentInterimInputText.isEmpty {
+              let isPrefixExtension =
+                cleanedInterim.hasPrefix(currentInterimInputText)
+                || currentInterimInputText.hasPrefix(cleanedInterim)
+
+              if !isPrefixExtension {
+                // If neither is a prefix of the other, check if this is a genuinely
+                // new segment spoken after a pause (>= 0.8s) vs an in-flight acoustic rewrite (< 0.8s).
+                let quietTime = timeSinceLastInterim ?? 0
+                if quietTime >= 0.8 {
+                  // A pause occurred; commit prior interim into finalInputText.
+                  finalInputText = Self.mergedTranscript(existing: finalInputText, update: currentInterimInputText)
+                }
+                // If quietTime < 0.8, this is an in-flight acoustic model rewrite
+                // (e.g. "a store" -> "the store"). We replace currentInterimInputText
+                // with cleanedInterim without duplicating words into finalInputText.
+              }
+            }
+
+            currentInterimInputText = cleanedInterim
+            let preview = finalInputText.isEmpty
+              ? cleanedInterim
+              : Self.mergedTranscript(existing: finalInputText, update: cleanedInterim)
             progressHandler?(preview)
           }
         }
       case .finalInput(let text):
         guard !TranscriptFormatter.cleaned(text).isEmpty else { continue }
         finalInputText = Self.mergedTranscript(existing: finalInputText, update: text)
+        currentInterimInputText = ""
         transcriptEventRevision += 1
         lastFinalInputRevision = transcriptEventRevision
-        lastFinalTextAt = Date()
+        lastFinalTextAt = now()
         if case .transcribe = mode { progressHandler?(finalInputText) }
       case .finalOutput(let text):
+        guard !TranscriptFormatter.cleaned(text).isEmpty else { continue }
         finalOutputText = Self.mergedTranscript(existing: finalOutputText, update: text)
-        lastFinalTextAt = Date()
+        currentInterimOutputText = ""
+        lastFinalTextAt = now()
         if case .translate = mode { progressHandler?(finalOutputText) }
       case .generationComplete:
         generationComplete = true

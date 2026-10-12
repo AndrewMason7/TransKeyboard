@@ -12,7 +12,7 @@ final class RelayIdleShutdownPolicyTests: XCTestCase {
         hasPendingCommand: false
       )
     )
-    XCTAssertEqual(RelayIdleShutdownPolicy.timeout, 120)
+    XCTAssertEqual(RelayIdleShutdownPolicy.timeout, 600)
   }
 
   func testBusyOperationAndPendingHandoffSuspendShutdown() {

@@ -44,6 +44,19 @@ final class SharedRelayStore: @unchecked Sendable {
     static let transcript = "relay.result.transcript"
   }
 
+  static let darwinStateNotificationName = CFNotificationName("group.com.geminivoice.relay.state" as CFString)
+  static let darwinCommandNotificationName = CFNotificationName("group.com.geminivoice.relay.command" as CFString)
+
+  static func postDarwinNotification(_ name: CFNotificationName) {
+    CFNotificationCenterPostNotification(
+      CFNotificationCenterGetDarwinNotifyCenter(),
+      name,
+      nil,
+      nil,
+      true
+    )
+  }
+
   private static let launchRequestLock = NSLock()
   private static let commandLock = NSLock()
   private static let resultLock = NSLock()
@@ -94,6 +107,7 @@ final class SharedRelayStore: @unchecked Sendable {
       defaults.set(date.timeIntervalSince1970, forKey: Key.commandCreatedAt)
       defaults.set(sequence, forKey: Key.commandSequence)
       flush()
+      Self.postDarwinNotification(Self.darwinCommandNotificationName)
       return sequence
     }
   }
@@ -183,7 +197,7 @@ final class SharedRelayStore: @unchecked Sendable {
       else {
         return nil
       }
-      if let expectedRequest, !pending.exactlyMatches(expectedRequest) {
+      if let expectedRequest, !pending.matchesForClaim(expectedRequest) {
         return nil
       }
 
@@ -239,6 +253,7 @@ final class SharedRelayStore: @unchecked Sendable {
       defaults.removeObject(forKey: Key.audioLevelUpdatedAt)
     }
     flush()
+    Self.postDarwinNotification(Self.darwinStateNotificationName)
   }
 
   func publishAudioLevel(_ level: Double, requestID: String) {
@@ -271,6 +286,7 @@ final class SharedRelayStore: @unchecked Sendable {
       defaults.set(transcript, forKey: Key.transcript)
       defaults.set(sequence, forKey: Key.resultSequence)
       flush()
+      Self.postDarwinNotification(Self.darwinStateNotificationName)
       return sequence
     }
   }

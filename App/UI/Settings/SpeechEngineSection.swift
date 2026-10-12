@@ -161,6 +161,8 @@ struct SpeechEngineSection: View {
       return GeminiVoiceTheme.accentColor.opacity(0.18)
     case .geminiBatch:
       return Color.blue.opacity(0.15)
+    case .appleSpeech:
+      return Color.orange.opacity(0.18)
     case .localOnDevice:
       return Color.green.opacity(0.18)
     case .autoFallback:
@@ -174,6 +176,8 @@ struct SpeechEngineSection: View {
       return GeminiVoiceTheme.accentColor
     case .geminiBatch:
       return .blue
+    case .appleSpeech:
+      return .orange
     case .localOnDevice:
       return .green
     case .autoFallback:

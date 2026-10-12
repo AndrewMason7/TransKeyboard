@@ -80,7 +80,10 @@ targets:
       - path: LiveActivityExtension
       - path: LiveActivityShared
       - path: Shared/Relay
+      - path: Shared/Theme
       - path: LiveActivityExtension/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: Resources/Assets.xcassets
         buildPhase: resources
     configFiles:
       Debug: Config/Debug.xcconfig

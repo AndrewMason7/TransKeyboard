@@ -6,7 +6,7 @@ import Observation
 import UIKit
 
 enum RelayIdleShutdownPolicy {
-  static let timeout: TimeInterval = 2 * 60
+  static let timeout: TimeInterval = 10 * 60
 
   static func canStop(
     relayIsRunning: Bool,
@@ -61,6 +61,7 @@ final class RelayController {
   var isKeyboardHandoffActive = false
   var requiresManualKeyboardReturn = false
   var audioLevel: Double = 0
+  var livePreviewText: String = ""
 
   @ObservationIgnored let configuration: AppConfiguration
   @ObservationIgnored let store: SharedRelayStore
@@ -131,14 +132,21 @@ final class RelayController {
     history = historyStore.items
     recoverableRecordings = recoveryStore.recordings
 
+    // FIX #H4.1 (per Tyler): Throttle level updates when idle to eliminate 20fps SwiftUI redraws
     capture.levelHandler = { [weak self] level in
       DispatchQueue.main.async { [weak self] in
-        guard let self,
-          self.status == .recording,
-          let requestID = self.activeRequestID
-        else { return }
-        self.audioLevel = level
-        self.store.publishAudioLevel(level, requestID: requestID)
+        guard let self, self.isRelayRunning else { return }
+        if self.status == .recording {
+          self.audioLevel = level
+          if let requestID = self.activeRequestID {
+            self.store.publishAudioLevel(level, requestID: requestID)
+          }
+        } else {
+          // When armed but idle, only notify observers if the amplitude delta is perceptible
+          if abs(self.audioLevel - level) >= 0.02 {
+            self.audioLevel = level
+          }
+        }
       }
     }
   }
@@ -198,10 +206,25 @@ final class RelayController {
       return
     }
 
-    guard configuration.hasUsableAPIKey else {
-      discardPendingLaunchRequest()
-      publishUnavailable(message: GeminiTranscriptionError.missingAPIKey.localizedDescription)
-      return
+    let isOfflineSpeechMode = configuration.speechEngineMode == .appleSpeech
+      || configuration.speechEngineMode == .localOnDevice
+
+    if isOfflineSpeechMode {
+      let speechAuthorized = await LocalSpeechTranscriber.ensureAuthorized()
+      guard startupGeneration == relayStartupGeneration else { return }
+      guard speechAuthorized else {
+        discardPendingLaunchRequest()
+        publishUnavailable(
+          message: "Speech recognition access is off. Enable it in Settings, then try again."
+        )
+        return
+      }
+    } else {
+      guard configuration.hasUsableAPIKey else {
+        discardPendingLaunchRequest()
+        publishUnavailable(message: GeminiTranscriptionError.missingAPIKey.localizedDescription)
+        return
+      }
     }
 
     do {
@@ -256,6 +279,7 @@ final class RelayController {
     capture.stop()
     pollTimer?.cancel()
     pollTimer = nil
+    teardownDarwinNotificationObserver()
     isRelayRunning = false
     relaySessionID = nil
     audioLevel = 0
@@ -327,6 +351,7 @@ final class RelayController {
   }
 
   isolated deinit {
+    teardownDarwinNotificationObserver()
     transcriptionTask?.cancel()
     recoveryRetryTask?.cancel()
     idleShutdownWorkItem?.cancel()

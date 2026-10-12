@@ -122,7 +122,14 @@ extension KeyboardViewController {
     if let raw, !raw.isEmpty {
       return raw
     }
-    return activeSpeechEngineMode == .localOnDevice ? "gemma-4-E2B-it.litert-lm" : SpeechEngineMode.defaultModelIdentifier
+    switch activeSpeechEngineMode {
+    case .localOnDevice:
+      return "gemma-4-E2B-it.litert-lm"
+    case .appleSpeech:
+      return "apple-speech-api"
+    default:
+      return SpeechEngineMode.defaultModelIdentifier
+    }
   }
 
   func updateRecordingPresentation(with snapshot: RelaySnapshot) {

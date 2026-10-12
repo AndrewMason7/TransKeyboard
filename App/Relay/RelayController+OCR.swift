@@ -37,7 +37,7 @@ extension RelayController {
       return
     }
     if let request = RelayLaunchRequest.parse(url) {
-      guard store.pendingLaunchRequest() == request else {
+      if let stored = store.pendingLaunchRequest(), !stored.matchesForClaim(request) {
         if !isRelayRunning {
           setLocalStatus(
             .error,

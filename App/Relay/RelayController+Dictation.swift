@@ -44,11 +44,13 @@ extension RelayController {
     requestID: String,
     action: RelayDictationAction
   ) {
+    livePreviewText = ""
     guard status != .transcribing, activeRequestID == nil else { return }
     markRelayActivityAndSuspendIdleShutdown()
 
-    if configuration.speechEngineMode == .localOnDevice {
+    if configuration.speechEngineMode == .localOnDevice || configuration.speechEngineMode == .appleSpeech {
       isUsingLocalTranscriber = true
+      localTranscriber.requiresOnDeviceRecognition = (configuration.speechEngineMode == .localOnDevice)
       let chunkHandler: @Sendable (Data) -> Void = { [weak self] data in
         Task { @MainActor [weak self] in
           self?.localTranscriber.appendAudioData(data)
@@ -67,9 +69,16 @@ extension RelayController {
         activeRequestID = requestID
         activeDictationAction = action
         activeStartedAt = startedAt
-        let listeningMessage = action == .translate
-          ? "Translating on-device… tap again when finished"
-          : "Transcribing on-device… tap the microphone again when finished"
+        let listeningMessage: String
+        if configuration.speechEngineMode == .appleSpeech {
+          listeningMessage = action == .translate
+            ? "Translating with Apple Speech… tap again when finished"
+            : "Transcribing with Apple Speech… tap the microphone again when finished"
+        } else {
+          listeningMessage = action == .translate
+            ? "Translating on-device… tap again when finished"
+            : "Transcribing on-device… tap the microphone again when finished"
+        }
         publish(
           .recording,
           message: listeningMessage,
@@ -129,8 +138,8 @@ extension RelayController {
         activeDictationAction = action
         activeStartedAt = startedAt
         let listeningMessage = action == .translate
-          ? "Recording for Gemini translation… tap again when finished"
-          : "Recording for Gemini 3.5 Transcribe… tap again when finished"
+          ? "Listening to translate… tap again when finished"
+          : "Listening… tap the microphone again when finished"
         publish(
           .recording,
           message: listeningMessage,

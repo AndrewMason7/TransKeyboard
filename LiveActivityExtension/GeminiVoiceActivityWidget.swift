@@ -96,19 +96,16 @@ struct GeminiVoiceActivityWidget: Widget {
 
   private var brandIcon: some View {
     ZStack {
-      RoundedRectangle(cornerRadius: 13)
-        .fill(
-          LinearGradient(
-            colors: [.cyan, .blue, .purple],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-          )
-        )
-      Image(systemName: "waveform.badge.mic")
-        .font(.system(size: 23, weight: .semibold))
-        .foregroundStyle(.white)
+      RoundedRectangle(cornerRadius: 13, style: .continuous)
+        .fill(LinearGradient.geminiVoicePrimary)
+
+      Image("WaveformBadgeMic")
+        .renderingMode(.template)
+        .foregroundStyle(Color(red: 0.1, green: 0.1, blue: 0.15))
     }
     .frame(width: 52, height: 52)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Gemini Voice")
   }
 
   @ViewBuilder

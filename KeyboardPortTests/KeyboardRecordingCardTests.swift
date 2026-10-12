@@ -61,6 +61,7 @@ final class KeyboardRecordingCardTests: XCTestCase {
   func testSpeechEngineModeShortNames() {
     XCTAssertEqual(SpeechEngineMode.geminiLive.shortName, "Gemini 3.5 Live")
     XCTAssertEqual(SpeechEngineMode.geminiBatch.shortName, "Gemini Transcribe")
+    XCTAssertEqual(SpeechEngineMode.appleSpeech.shortName, "Apple Speech API")
     XCTAssertEqual(SpeechEngineMode.localOnDevice.shortName, "Local On-Device")
     XCTAssertEqual(SpeechEngineMode.autoFallback.shortName, "Auto-Fallback")
   }

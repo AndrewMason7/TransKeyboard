@@ -114,7 +114,24 @@ extension GeminiLiveSpeechSession {
     let next = TranscriptFormatter.cleaned(update)
     guard !next.isEmpty else { return current }
     guard !current.isEmpty else { return next }
-    if next != current, next.hasPrefix(current) { return next }
+
+    if next != current {
+      let prefixesToCheck = [
+        current,
+        current.trimmingCharacters(in: CharacterSet(charactersIn: ".?!,:;-— \n\t")),
+      ]
+      for prefix in prefixesToCheck where !prefix.isEmpty {
+        if next.hasPrefix(prefix) {
+          if next.count == prefix.count { return next }
+          let boundaryIndex = next.index(next.startIndex, offsetBy: prefix.count)
+          let boundaryChar = next[boundaryIndex]
+          if boundaryChar.isWhitespace || boundaryChar.isPunctuation {
+            return next
+          }
+        }
+      }
+    }
+
     let insertion = TranscriptFormatter.textForInsertion(next, contextBefore: current)
     return TranscriptFormatter.cleaned(current + insertion)
   }

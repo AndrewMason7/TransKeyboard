@@ -33,6 +33,12 @@ struct SettingsView: View {
         }
         .glassCard(cornerRadius: 20, padding: 18)
 
+        #if DEBUG
+        // Card 4: Developer Feature Flags (Debug Builds Only)
+        FeatureFlagsSection()
+          .glassCard(cornerRadius: 20, padding: 18)
+        #endif
+
         // Privacy note
         privacyFooter
       }
@@ -42,6 +48,11 @@ struct SettingsView: View {
     }
     .background(Color(UIColor.systemGroupedBackground))
     .navigationTitle("Settings")
+    .onChange(of: configuration.speechEngineMode) { _, newMode in
+      if (newMode == .appleSpeech || newMode == .localOnDevice), !relay.isRelayRunning {
+        Task { await relay.startRelay() }
+      }
+    }
   }
 
   private var privacyFooter: some View {

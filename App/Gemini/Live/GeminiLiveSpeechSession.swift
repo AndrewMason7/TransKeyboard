@@ -37,6 +37,7 @@ actor GeminiLiveSpeechSession {
   let model: String
   let progressHandler: (@Sendable (String) -> Void)?
   let socketFactory: SocketFactory
+  let now: @Sendable () -> Date
   nonisolated let audioStream: AsyncStream<Data>
   nonisolated let audioContinuation: AsyncStream<Data>.Continuation
 
@@ -52,6 +53,9 @@ actor GeminiLiveSpeechSession {
   var isClosed = false
   var finalInputText = ""
   var finalOutputText = ""
+  var currentInterimInputText = ""
+  var currentInterimOutputText = ""
+  var lastInterimInputAt: Date?
   var lastFinalTextAt: Date?
   var transcriptEventRevision: UInt64 = 0
   var lastInterimInputRevision: UInt64?
@@ -66,6 +70,7 @@ actor GeminiLiveSpeechSession {
     socketFactory: @escaping SocketFactory = { endpoint in
       URLSessionGeminiLiveSocket(endpoint: endpoint)
     },
+    now: @escaping @Sendable () -> Date = { Date() },
     progressHandler: (@Sendable (String) -> Void)? = nil
   ) {
     let streamPair = AsyncStream<Data>.makeStream(
@@ -74,6 +79,7 @@ actor GeminiLiveSpeechSession {
     self.mode = mode
     self.model = model
     self.socketFactory = socketFactory
+    self.now = now
     self.progressHandler = progressHandler
     self.audioStream = streamPair.stream
     self.audioContinuation = streamPair.continuation

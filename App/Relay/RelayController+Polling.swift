@@ -5,6 +5,7 @@ import UIKit
 
 extension RelayController {
   func beginPolling() {
+    setupDarwinNotificationObserver()
     let timer = DispatchSource.makeTimerSource(queue: .main)
     timer.schedule(deadline: .now(), repeating: .milliseconds(200), leeway: .milliseconds(40))
     timer.setEventHandler { [weak self] in
@@ -12,6 +13,33 @@ extension RelayController {
     }
     pollTimer = timer
     timer.resume()
+  }
+
+  func setupDarwinNotificationObserver() {
+    let center = CFNotificationCenterGetDarwinNotifyCenter()
+    let name = SharedRelayStore.darwinCommandNotificationName
+    let observer = Unmanaged.passUnretained(self).toOpaque()
+    CFNotificationCenterRemoveObserver(center, observer, name, nil)
+    CFNotificationCenterAddObserver(
+      center,
+      observer,
+      { _, observer, _, _, _ in
+        guard let observer else { return }
+        let controller = Unmanaged<RelayController>.fromOpaque(observer).takeUnretainedValue()
+        DispatchQueue.main.async {
+          controller.pollRelayStore()
+        }
+      },
+      name.rawValue,
+      nil,
+      .deliverImmediately
+    )
+  }
+
+  func teardownDarwinNotificationObserver() {
+    let center = CFNotificationCenterGetDarwinNotifyCenter()
+    let observer = Unmanaged.passUnretained(self).toOpaque()
+    CFNotificationCenterRemoveObserver(center, observer, SharedRelayStore.darwinCommandNotificationName, nil)
   }
 
   func markRelayActivityAndSuspendIdleShutdown() {

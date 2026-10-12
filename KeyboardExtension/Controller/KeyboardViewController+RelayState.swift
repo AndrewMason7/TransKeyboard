@@ -54,7 +54,8 @@ extension KeyboardViewController {
 
     guard snapshot.hostIsOnline(), snapshot.status != .offline else {
       if mode == .openingHost {
-        if let activeRequestID,
+        if awaitsKeyboardReactivation,
+          let activeRequestID,
           let activeDictationAction,
           let trackedRequestCreatedAt,
           hostLaunchAttemptedForRequestID != activeRequestID
@@ -74,12 +75,14 @@ extension KeyboardViewController {
           unavailableMessage.map { "\($0) — × cancels" }
             ?? (launchFailed
               ? "Open Gemini Voice manually — × cancels"
-              : "Opening Gemini Voice — × cancels"),
+              : (awaitsKeyboardReactivation
+                ? "Opening Gemini Voice — × cancels"
+                : "Starting dictation — × cancels")),
           color: unavailableMessage != nil || launchFailed ? .systemOrange : .systemCyan
         )
         configureMicrophone(
-          title: "Opening…",
-          image: "arrow.up.forward.app",
+          title: awaitsKeyboardReactivation ? "Opening…" : "Starting…",
+          image: awaitsKeyboardReactivation ? "arrow.up.forward.app" : "waveform",
           color: .systemGray
         )
         configureTranslationButton(color: .systemGray)
@@ -375,9 +378,14 @@ extension KeyboardViewController {
       mode = .transcribing
     case .idle:
       if mode == .openingHost {
-        // `.idle` can be a transient snapshot while the containing app
-        // starts. Wait for a matching `.recording` acknowledgement or
-        // the launch timeout instead of enabling a second request.
+        if !awaitsKeyboardReactivation {
+          let age = trackedRequestCreatedAt.map { Date().timeIntervalSince($0) } ?? 0
+          if age > 4.0 {
+            clearTrackedRequest()
+            mode = .idle
+            setStatus("Dictation not started — tap Dictate to retry", color: .systemOrange)
+          }
+        }
         return
       }
       if mode == .recording || mode == .cancelling || mode == .transcribing {
@@ -470,7 +478,9 @@ extension KeyboardViewController {
       return
     }
 
-    let sameDocument = textDocumentProxy.documentIdentifier == activeDocumentIdentifier
+    let sameDocument =
+      activeDocumentIdentifier == nil
+      || textDocumentProxy.documentIdentifier == activeDocumentIdentifier
     let sameContext =
       Self.contextFingerprint(
         textDocumentProxy.documentContextBeforeInput
@@ -480,7 +490,7 @@ extension KeyboardViewController {
       ) == contextAfterFingerprintAtRequest
     clearTrackedRequest()
 
-    if keyboardIsVisible && sameDocument && sameContext {
+    if keyboardIsVisible && (sameContext || sameDocument) {
       insertTranscript(transcript)
       markResultConsumed(sequence: snapshot.resultSequence)
       mode = .idle

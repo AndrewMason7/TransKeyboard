@@ -43,10 +43,30 @@ struct StudioTestPlaygroundView: View {
           )
 
         if displayedText.isEmpty {
-          Text("Tap 'Start Test Dictation' below and speak to test your microphone and Gemini connection…")
-            .font(.subheadline)
-            .foregroundStyle(.secondary.opacity(0.7))
+          if relay.status == .recording && isTestActive {
+            HStack(spacing: 8) {
+              ProgressView()
+                .controlSize(.small)
+              Text("Listening… speak into the microphone")
+                .font(.subheadline)
+                .foregroundStyle(GeminiVoiceTheme.accentColor)
+            }
             .padding(14)
+          } else if relay.status == .transcribing && isTestActive {
+            HStack(spacing: 8) {
+              ProgressView()
+                .controlSize(.small)
+              Text(relay.statusMessage)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+            .padding(14)
+          } else {
+            Text("Tap 'Start Test Dictation' below and speak to test your microphone…")
+              .font(.subheadline)
+              .foregroundStyle(.secondary.opacity(0.7))
+              .padding(14)
+          }
         } else {
           ScrollView {
             Text(displayedText)
@@ -62,19 +82,35 @@ struct StudioTestPlaygroundView: View {
 
       // Action buttons
       HStack(spacing: 10) {
-        if relay.status == .recording && isTestActive {
+        if (relay.status == .recording || relay.status == .transcribing) && isTestActive {
           Button {
             finishTestDictation()
           } label: {
-            Label("Finish & Insert", systemImage: "checkmark.circle.fill")
-              .font(.subheadline.weight(.semibold))
+            if relay.status == .transcribing {
+              HStack(spacing: 6) {
+                ProgressView()
+                  .controlSize(.small)
+                  .tint(.white)
+                Text("Finalizing…")
+                  .font(.subheadline.weight(.semibold))
+              }
               .frame(maxWidth: .infinity)
               .padding(.vertical, 12)
-              .background(Color.green)
+              .background(Color.secondary.opacity(0.4))
               .foregroundStyle(.white)
               .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            } else {
+              Label("Finish & Insert", systemImage: "checkmark.circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.green)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
           }
           .buttonStyle(.plain)
+          .disabled(relay.status == .transcribing)
 
           Button {
             cancelTestDictation()
@@ -123,13 +159,31 @@ struct StudioTestPlaygroundView: View {
       }
     }
     .glassCard(cornerRadius: 22, padding: 18)
+    .onChange(of: relay.status) { _, newStatus in
+      if isTestActive && newStatus == .idle {
+        isTestActive = false
+        testText = relay.history.first?.text ?? ""
+      } else if isTestActive && newStatus == .error {
+        isTestActive = false
+      }
+    }
   }
 
+  // FIX #H5.1 & #Jake.1 (per Jamie & Jake): Eliminate nested ternary soup with clean hierarchical branches
   private var displayedText: String {
+    if relay.status == .recording {
+      return relay.livePreviewText
+    }
+    if relay.status == .transcribing && isTestActive {
+      if !relay.livePreviewText.isEmpty {
+        return relay.livePreviewText
+      }
+      return testText.isEmpty ? relay.statusMessage : testText
+    }
     if !testText.isEmpty {
       return testText
     }
-    return relay.history.first?.text ?? ""
+    return isTestActive ? "" : (relay.history.first?.text ?? "")
   }
 
   // FIX #8 (per Jamie & Marcus): Verify relay readiness before committing test state
@@ -143,6 +197,9 @@ struct StudioTestPlaygroundView: View {
         isTestActive = false
         return
       }
+      if relay.configuration.speechEngineMode == .appleSpeech || relay.configuration.speechEngineMode == .localOnDevice {
+        _ = await LocalSpeechTranscriber.ensureAuthorized()
+      }
       isTestActive = true
       let requestID = UUID().uuidString
       relay.beginDictation(requestID: requestID, action: .transcribe)
@@ -150,9 +207,10 @@ struct StudioTestPlaygroundView: View {
   }
 
   private func finishTestDictation() {
-    isTestActive = false
     if let requestID = relay.activeRequestID {
       relay.finishDictationAndTranscribe(requestID: requestID)
+    } else {
+      isTestActive = false
     }
   }
 

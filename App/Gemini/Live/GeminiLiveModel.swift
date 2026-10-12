@@ -23,6 +23,12 @@ public struct GeminiLiveModel: Identifiable, Hashable, Sendable {
     subtitle: "Cloud speech transcription via Gemini 3.5 Transcribe"
   )
 
+  public static let appleSpeechAPI = GeminiLiveModel(
+    id: "apple-speech-api",
+    displayName: "apple-speech-api",
+    subtitle: "100% offline speech recognition via Apple Speech framework"
+  )
+
   public static let localGemma = GeminiLiveModel(
     id: ModelDownloadManager.defaultModelFileName,
     displayName: ModelDownloadManager.defaultModelFileName,
@@ -32,6 +38,7 @@ public struct GeminiLiveModel: Identifiable, Hashable, Sendable {
   public static let allAvailable: [GeminiLiveModel] = [
     .gemini35TranscribeLive,
     .gemini35Transcribe,
+    .appleSpeechAPI,
     .localGemma
   ]
 

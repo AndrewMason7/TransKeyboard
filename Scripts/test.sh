@@ -54,6 +54,7 @@ cmd=(
   -scheme "$scheme"
   -destination "$destination"
   -derivedDataPath DerivedData
+  -allowProvisioningUpdates
   -collect-test-diagnostics never
 )
 

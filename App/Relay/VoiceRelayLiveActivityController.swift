@@ -44,6 +44,13 @@ final class VoiceRelayLiveActivityController {
     controlToken: String,
     relaySessionID: String
   ) {
+    guard FeatureFlagStore.shared[.liveActivity] else {
+      if activityID != nil {
+        end(message: "Live Activity disabled by feature flag.")
+      }
+      return
+    }
+
     let state = contentState(
       status: status,
       message: message,

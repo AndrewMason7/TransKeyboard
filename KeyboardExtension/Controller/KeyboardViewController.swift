@@ -78,6 +78,38 @@ final class KeyboardViewController: UIInputViewController, UIInputViewAudioFeedb
     ) { (controller: KeyboardViewController, _) in
       controller.updateKeyboardHeight()
     }
+    setupDarwinNotificationObserver()
+  }
+
+  deinit {
+    teardownDarwinNotificationObserver()
+  }
+
+  func setupDarwinNotificationObserver() {
+    let center = CFNotificationCenterGetDarwinNotifyCenter()
+    let name = SharedRelayStore.darwinStateNotificationName
+    let observer = Unmanaged.passUnretained(self).toOpaque()
+    CFNotificationCenterRemoveObserver(center, observer, name, nil)
+    CFNotificationCenterAddObserver(
+      center,
+      observer,
+      { _, observer, _, _, _ in
+        guard let observer else { return }
+        let keyboard = Unmanaged<KeyboardViewController>.fromOpaque(observer).takeUnretainedValue()
+        DispatchQueue.main.async {
+          keyboard.refreshFromSharedState()
+        }
+      },
+      name.rawValue,
+      nil,
+      .deliverImmediately
+    )
+  }
+
+  nonisolated func teardownDarwinNotificationObserver() {
+    let center = CFNotificationCenterGetDarwinNotifyCenter()
+    let observer = Unmanaged.passUnretained(self).toOpaque()
+    CFNotificationCenterRemoveObserver(center, observer, SharedRelayStore.darwinStateNotificationName, nil)
   }
 
   override func viewWillAppear(_ animated: Bool) {

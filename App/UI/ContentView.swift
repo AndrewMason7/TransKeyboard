@@ -28,7 +28,7 @@ struct ContentView: View {
         )
       }
       .tabItem {
-        Label("Studio", systemImage: "waveform.circle.fill")
+        Label("Dictation", systemImage: "waveform.badge.mic")
       }
       .tag(AppTab.studio)
 
@@ -56,7 +56,7 @@ struct ContentView: View {
     }
     .tint(GeminiVoiceTheme.accentColor)
     .overlay {
-      if relay.isKeyboardHandoffActive {
+      if relay.isKeyboardHandoffActive && FeatureFlagStore.shared[.keyboardHandoff] {
         KeyboardHandoffOverlay(relay: relay)
       }
     }

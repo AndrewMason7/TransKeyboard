@@ -12,6 +12,7 @@ final class AppConfiguration {
     static let autoStartRelayOnLaunch = "configuration.auto-start-relay-on-launch"
     static let autoStopRelayOnBackground = "configuration.auto-stop-relay-on-background"
     static let liveTranscriptionModel = "configuration.live-transcription-model"
+    static let didMigrateToBatchDefault = "configuration.did-migrate-to-batch-default-v1"
   }
 
   @ObservationIgnored private let defaults: UserDefaults
@@ -33,9 +34,12 @@ final class AppConfiguration {
     }
   }
 
+  public static let appleSpeechModelIdentifier = "apple-speech-api"
+
   public static let availableTranscriptionModels: [String] = [
-    "gemini-3.5-transcribe-live",
     "gemini-3.5-transcribe",
+    "gemini-3.5-transcribe-live",
+    appleSpeechModelIdentifier,
     ModelDownloadManager.defaultModelFileName
   ]
 
@@ -48,9 +52,11 @@ final class AppConfiguration {
       }
       switch speechEngineMode {
       case .geminiLive, .autoFallback:
-        return SpeechEngineMode.defaultModelIdentifier
+        return "gemini-3.5-transcribe-live"
       case .geminiBatch:
-        return "gemini-3.5-transcribe"
+        return SpeechEngineMode.defaultModelIdentifier
+      case .appleSpeech:
+        return Self.appleSpeechModelIdentifier
       case .localOnDevice:
         return ModelDownloadManager.defaultModelFileName
       }
@@ -83,9 +89,11 @@ final class AppConfiguration {
         let newModel: String
         switch speechEngineMode {
         case .geminiLive, .autoFallback:
-          newModel = SpeechEngineMode.defaultModelIdentifier
+          newModel = "gemini-3.5-transcribe-live"
         case .geminiBatch:
-          newModel = "gemini-3.5-transcribe"
+          newModel = SpeechEngineMode.defaultModelIdentifier
+        case .appleSpeech:
+          newModel = Self.appleSpeechModelIdentifier
         case .localOnDevice:
           newModel = ModelDownloadManager.defaultModelFileName
         }
@@ -169,10 +177,17 @@ final class AppConfiguration {
     let securedOverride = credentialStore.loadAPIKey()
     self.apiKeyOverride = securedOverride.isEmpty ? legacyOverride : securedOverride
     self.credentialPersistenceWarning = nil
+    let didMigrateToBatch = defaults.bool(forKey: Key.didMigrateToBatchDefault)
     let savedEngineMode =
       defaults.string(forKey: Key.speechEngineMode)
       ?? resolvedSharedDefaults.string(forKey: Key.speechEngineMode)
-    let resolvedEngineMode = savedEngineMode.flatMap(SpeechEngineMode.init(rawValue:)) ?? .defaultMode
+    let resolvedEngineMode: SpeechEngineMode
+    if !didMigrateToBatch && (savedEngineMode == nil || savedEngineMode == "geminiLive") {
+      resolvedEngineMode = .geminiBatch
+      defaults.set(true, forKey: Key.didMigrateToBatchDefault)
+    } else {
+      resolvedEngineMode = savedEngineMode.flatMap(SpeechEngineMode.init(rawValue:)) ?? .defaultMode
+    }
     self.speechEngineMode = resolvedEngineMode
     let savedLiveModel = defaults.string(forKey: Key.liveTranscriptionModel)?.trimmingCharacters(in: .whitespacesAndNewlines)
     self.liveTranscriptionModel = (savedLiveModel?.isEmpty == false) ? savedLiveModel! : GeminiLiveSpeechSession.defaultTranscriptionModel
@@ -188,7 +203,12 @@ final class AppConfiguration {
     let savedModelIdentifier =
       defaults.string(forKey: Key.activeModelIdentifier)
       ?? resolvedSharedDefaults.string(forKey: Key.activeModelIdentifier)
-    let initialModel = (savedModelIdentifier?.isEmpty == false) ? savedModelIdentifier! : SpeechEngineMode.defaultModelIdentifier
+    let initialModel: String
+    if !didMigrateToBatch && (savedModelIdentifier == nil || savedModelIdentifier == "gemini-3.5-transcribe-live") {
+      initialModel = SpeechEngineMode.defaultModelIdentifier
+    } else {
+      initialModel = (savedModelIdentifier?.isEmpty == false) ? savedModelIdentifier! : SpeechEngineMode.defaultModelIdentifier
+    }
     defaults.set(initialModel, forKey: Key.activeModelIdentifier)
     resolvedSharedDefaults.set(initialModel, forKey: Key.activeModelIdentifier)
     resolvedSharedDefaults.set(resolvedEngineMode.rawValue, forKey: Key.speechEngineMode)

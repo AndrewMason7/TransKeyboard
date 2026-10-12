@@ -31,6 +31,7 @@ xcodebuild \
   -project "$PROJECT_PATH" \
   -scheme GeminiVoice \
   -destination "generic/platform=iOS" \
+  -allowProvisioningUpdates \
   -quiet \
   build
 
@@ -47,8 +48,41 @@ APP_BUNDLE_ID="$(
     "$APP_PATH/Info.plist" 2>/dev/null || echo "com.example.GeminiVoiceSample"
 )"
 
-print "📲 Installing $APP_BUNDLE_ID onto iPhone..."
-xcrun devicectl device install app --device "$DEVICE_SELECTOR" "$APP_PATH" --timeout 120
+INSTALL_TARGET="$APP_PATH"
+# Prefer Development certificate for get-task-allow / debugging support, fallback to Distribution
+if [[ -f "/Users/andrew/Documents/GitHub/Certificates 17/development/MoeDevelopment.pem" && -f "/Users/andrew/Documents/GitHub/Certificates 17/development/MoeDevelopment.mobileprovision" ]]; then
+  MOE_PEM="/Users/andrew/Documents/GitHub/Certificates 17/development/MoeDevelopment.pem"
+  MOE_PROVISION="/Users/andrew/Documents/GitHub/Certificates 17/development/MoeDevelopment.mobileprovision"
+else
+  MOE_PEM="/Users/andrew/Documents/GitHub/Certificates 17/distribution/MoeDistribution.pem"
+  MOE_PROVISION="/Users/andrew/Documents/GitHub/Certificates 17/distribution/MoeDistribution.mobileprovision"
+fi
+
+if command -v plumesign >/dev/null 2>&1 && [[ -f "$MOE_PEM" && -f "$MOE_PROVISION" ]]; then
+  print "🔏 Signing with Moe Developer Certificate via plumesign..."
+  TMP_STAGE="/tmp/gemini_stage_$$"
+  mkdir -p "$TMP_STAGE/Payload"
+  cp -R "$APP_PATH" "$TMP_STAGE/Payload/"
+  UNSIGNED_IPA="$TMP_STAGE/GeminiVoice_unsigned.ipa"
+  SIGNED_IPA="$TMP_STAGE/GeminiVoice_signed.ipa"
+  (cd "$TMP_STAGE" && zip -rq "$UNSIGNED_IPA" Payload)
+
+  if plumesign sign \
+    --pem "$MOE_PEM" \
+    --provision "$MOE_PROVISION" \
+    --package "$UNSIGNED_IPA" \
+    -o "$SIGNED_IPA" >/dev/null 2>&1; then
+    INSTALL_TARGET="$SIGNED_IPA"
+    print "✅ Successfully signed with Moe Developer Profile (no 3-app limit)!"
+  else
+    print "⚠️ plumesign signing failed, falling back to direct install..."
+  fi
+fi
+
+print "📲 Installing $APP_BUNDLE_ID onto iPhone (updating in-place)..."
+xcrun devicectl device install app --device "$DEVICE_SELECTOR" "$INSTALL_TARGET" --timeout 120
+
+[[ -n "${TMP_STAGE:-}" && -d "${TMP_STAGE:-}" ]] && rm -rf "$TMP_STAGE"
 
 print "✨ Installation successful!"
 print "🚀 Launching application on iPhone..."

@@ -51,7 +51,7 @@ extension GeminiLiveSpeechSession {
     do {
       switch mode {
       case .transcribe:
-        let boundaryInitiatedAt = Date()
+        let boundaryInitiatedAt = now()
         likelySpeechWasRecentAtBoundary =
           lastLikelySpeechSentAt.map {
             boundaryInitiatedAt.timeIntervalSince($0) < 0.8
@@ -61,7 +61,7 @@ extension GeminiLiveSpeechSession {
         // older segment delivered while the send is in flight remains
         // part of the baseline and cannot finalize the drained stream.
         finalInputRevisionAtBoundary = lastFinalInputRevision
-        transcriptionBoundarySentAt = Date()
+        transcriptionBoundarySentAt = now()
       case .translate:
         // A previous automatically detected translation turn may already
         // have completed. Only a generation completion observed after this
@@ -109,7 +109,7 @@ extension GeminiLiveSpeechSession {
           > (lastFinalInputRevision ?? 0)
         let boundaryAge =
           transcriptionBoundarySentAt.map {
-            Date().timeIntervalSince($0)
+            now().timeIntervalSince($0)
           } ?? 0
         let hasPostBoundaryFinal =
           lastFinalInputRevision.map { revision in
@@ -118,7 +118,7 @@ extension GeminiLiveSpeechSession {
           } == true
         let finalQuietPeriodElapsed =
           lastFinalTextAt.map {
-            Date().timeIntervalSince($0) >= 0.35
+            now().timeIntervalSince($0) >= 0.35
           } == true
         let finalIsSafeForFinishedAudio =
           hasPostBoundaryFinal
@@ -153,6 +153,8 @@ extension GeminiLiveSpeechSession {
     audioContinuation.finish()
     audioConsumerTask?.cancel()
     audioConsumerTask = nil
+    currentInterimInputText = ""
+    currentInterimOutputText = ""
     await close(code: .goingAway)
   }
 }

@@ -124,6 +124,27 @@ private final class TextCollector: @unchecked Sendable {
   }
 }
 
+private final class TestClock: @unchecked Sendable {
+  private let lock = NSLock()
+  private var current: Date
+
+  init(_ initial: Date = Date()) {
+    self.current = initial
+  }
+
+  var now: Date {
+    lock.lock()
+    defer { lock.unlock() }
+    return current
+  }
+
+  func advance(by interval: TimeInterval) {
+    lock.lock()
+    defer { lock.unlock() }
+    current = current.addingTimeInterval(interval)
+  }
+}
+
 final class GeminiLiveSpeechSessionTests: XCTestCase {
   func testKeyboardActionsSelectTheirDedicatedLiveModes() {
     XCTAssertEqual(
@@ -571,6 +592,20 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
       ),
       "I like apple apple"
     )
+    XCTAssertEqual(
+      GeminiLiveSpeechSession.mergedTranscript(
+        existing: "Hello world.",
+        update: "Hello world, how are you"
+      ),
+      "Hello world, how are you"
+    )
+    XCTAssertEqual(
+      GeminiLiveSpeechSession.mergedTranscript(
+        existing: "I like pie.",
+        update: "I like pieces"
+      ),
+      "I like pie. I like pieces"
+    )
   }
 
   func testInterimInputCombinesWithPriorFinalizedInput() async throws {
@@ -605,6 +640,99 @@ final class GeminiLiveSpeechSessionTests: XCTestCase {
     await fulfillment(of: [interimReceived], timeout: 2)
 
     XCTAssertEqual(collector.elements, ["First turn.", "First turn. Second turn"])
+    await session.cancel()
+  }
+
+  func testInterimInputPreservesPriorInterimAcrossPauses() async throws {
+    let socket = MockGeminiLiveSocket()
+    try await socket.enqueueJSONObject(["setupComplete": [:]])
+    let collector = TextCollector()
+    let firstInterimReceived = expectation(description: "first interim received")
+    let secondInterimReceived = expectation(description: "second interim received")
+    let clock = TestClock()
+    let session = GeminiLiveSpeechSession(
+      mode: .transcribe,
+      socketFactory: { _ in socket },
+      now: { clock.now },
+      progressHandler: { text in
+        collector.append(text)
+        if text == "First thought" {
+          firstInterimReceived.fulfill()
+        }
+        if text == "First thought Second thought after pause" {
+          secondInterimReceived.fulfill()
+        }
+      }
+    )
+
+    try await session.connect(credential: .apiKey("development-key"))
+
+    // User says "First thought" before taking a break
+    try await socket.enqueueJSONObject(
+      ["serverContent": ["interimInputTranscription": ["text": "First thought"]]]
+    )
+    await fulfillment(of: [firstInterimReceived], timeout: 2)
+
+    // User takes a break of 2-3 seconds: clock advances by 2.5s
+    clock.advance(by: 2.5)
+
+    // Server starts a new segmented interim
+    try await socket.enqueueJSONObject(
+      ["serverContent": ["interimInputTranscription": ["text": "Second thought after pause"]]]
+    )
+    await fulfillment(of: [secondInterimReceived], timeout: 2)
+
+    XCTAssertEqual(
+      collector.elements,
+      ["First thought", "First thought Second thought after pause"]
+    )
+    let finalText = await session.selectedFinalText
+    XCTAssertEqual(finalText, "First thought Second thought after pause")
+    await session.cancel()
+  }
+
+  func testInterimInputAcousticRewriteDoesNotDuplicateWords() async throws {
+    let socket = MockGeminiLiveSocket()
+    try await socket.enqueueJSONObject(["setupComplete": [:]])
+    let collector = TextCollector()
+    let firstInterimReceived = expectation(description: "first interim received")
+    let rewriteReceived = expectation(description: "rewrite received")
+    let clock = TestClock()
+    let session = GeminiLiveSpeechSession(
+      mode: .transcribe,
+      socketFactory: { _ in socket },
+      now: { clock.now },
+      progressHandler: { text in
+        collector.append(text)
+        if text == "I went to a" {
+          firstInterimReceived.fulfill()
+        }
+        if text == "I went to the store" {
+          rewriteReceived.fulfill()
+        }
+      }
+    )
+
+    try await session.connect(credential: .apiKey("development-key"))
+
+    try await socket.enqueueJSONObject(
+      ["serverContent": ["interimInputTranscription": ["text": "I went to a"]]]
+    )
+    await fulfillment(of: [firstInterimReceived], timeout: 2)
+
+    // Acoustic revision arrives 150ms later (in-flight speech, no 0.8s pause)
+    clock.advance(by: 0.15)
+    try await socket.enqueueJSONObject(
+      ["serverContent": ["interimInputTranscription": ["text": "I went to the store"]]]
+    )
+    await fulfillment(of: [rewriteReceived], timeout: 2)
+
+    XCTAssertEqual(
+      collector.elements,
+      ["I went to a", "I went to the store"]
+    )
+    let finalText = await session.selectedFinalText
+    XCTAssertEqual(finalText, "I went to the store")
     await session.cancel()
   }
 }

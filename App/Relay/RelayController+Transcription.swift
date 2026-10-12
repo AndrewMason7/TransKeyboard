@@ -36,6 +36,7 @@ extension RelayController {
     }
     capture.cancelSegment()
     audioLevel = 0
+    livePreviewText = ""
     activeRequestID = nil
     activeDictationAction = nil
     activeStartedAt = nil
@@ -55,6 +56,7 @@ extension RelayController {
       processingRequestID == requestID
     else { return }
 
+    livePreviewText = ""
     transcriptionGeneration += 1
     transcriptionTask?.cancel()
     transcriptionTask = nil
@@ -106,6 +108,14 @@ extension RelayController {
     maximumDurationWorkItem?.cancel()
     maximumDurationWorkItem = nil
 
+    NSLog(
+      "GV_FINISH_DICTATION request=%@ action=%@ mode=%@ model=%@",
+      requestID,
+      activeDictationAction?.rawValue ?? "nil",
+      configuration.speechEngineMode.rawValue,
+      configuration.selectedModelId
+    )
+
     let segment: CapturedAudioSegment
     let action = activeDictationAction ?? .transcribe
     let liveSession = liveRequestID == requestID ? activeLiveSession : nil
@@ -137,9 +147,16 @@ extension RelayController {
       activeLocalAudioSegment = segment
       processingRequestID = requestID
       transcriptionGeneration += 1
-      let processingMessage = action == .translate
-        ? "Finalizing on-device translation…"
-        : "Finalizing on-device transcript…"
+      let processingMessage: String
+      if configuration.speechEngineMode == .appleSpeech {
+        processingMessage = action == .translate
+          ? "Finalizing Apple Speech translation…"
+          : "Finalizing Apple Speech transcript…"
+      } else {
+        processingMessage = action == .translate
+          ? "Finalizing on-device translation…"
+          : "Finalizing on-device transcript…"
+      }
       publish(
         .transcribing,
         message: processingMessage,
@@ -313,6 +330,7 @@ extension RelayController {
             ? "Translated to \(translationTarget.name) and inserted — ready"
             : "Inserted — ready for the next dictation"
         }
+        livePreviewText = ""
         publish(.idle, message: completionMessage)
         markRelayActivityAndScheduleIdleShutdown()
       } catch is CancellationError {
@@ -389,10 +407,11 @@ extension RelayController {
     action: RelayDictationAction
   ) {
     guard status == .recording, activeRequestID == requestID else { return }
-    let now = Date()
-    guard now.timeIntervalSince(lastLivePreviewAt) >= 0.35 else { return }
     let cleaned = TranscriptFormatter.cleaned(text)
     guard !cleaned.isEmpty else { return }
+    livePreviewText = cleaned
+    let now = Date()
+    guard now.timeIntervalSince(lastLivePreviewAt) >= 0.35 else { return }
     lastLivePreviewAt = now
 
     let preview = String(cleaned.prefix(100))
@@ -494,7 +513,9 @@ extension RelayController {
       Task {
         guard self.processingRequestID == requestID || self.activeRequestID == requestID else { return }
         let processedText: String
-        if action == .translate {
+        if self.configuration.speechEngineMode == .appleSpeech && action != .translate {
+          processedText = rawText
+        } else if action == .translate {
           processedText = await localTextProcessor.translateText(rawText, targetLanguageCode: configuration.translationTarget.code)
         } else {
           processedText = await localTextProcessor.formatTranscript(rawText)
@@ -538,6 +559,7 @@ extension RelayController {
       activeLocalAudioSegment = nil
     }
     processingRequestID = nil
+    livePreviewText = ""
     endTranscriptionBackgroundTaskIfNeeded()
     do {
       try addToHistory(text)
@@ -546,9 +568,16 @@ extension RelayController {
         requestID: requestID,
         kind: .dictation
       )
-      let completionMessage = action == .translate
-        ? "On-device translation inserted — ready"
-        : "On-device transcript inserted — ready"
+      let completionMessage: String
+      if configuration.speechEngineMode == .appleSpeech {
+        completionMessage = action == .translate
+          ? "Apple Speech translation inserted — ready"
+          : "Apple Speech transcript inserted — ready"
+      } else {
+        completionMessage = action == .translate
+          ? "On-device translation inserted — ready"
+          : "On-device transcript inserted — ready"
+      }
       publish(.idle, message: completionMessage)
       markRelayActivityAndScheduleIdleShutdown()
     } catch {

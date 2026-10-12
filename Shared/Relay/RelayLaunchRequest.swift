@@ -2,13 +2,31 @@ import Darwin
 import Foundation
 
 enum VoiceAppGroup {
+  static let candidates: [String] = {
+    var list: [String] = []
+    if let configured = (Bundle.main.object(forInfoDictionaryKey: "GeminiVoiceAppGroupIdentifier") as? String)?
+      .trimmingCharacters(in: .whitespacesAndNewlines), !configured.isEmpty {
+      list.append(configured)
+    }
+    for known in [
+      "group.com.moe.kanan",
+      "group.com.andrewmason.GeminiVoiceSample",
+      "group.com.example.GeminiVoiceSample",
+    ] {
+      if !list.contains(known) {
+        list.append(known)
+      }
+    }
+    return list
+  }()
+
   static var identifier: String {
-    let configured =
-      Bundle.main.object(
-        forInfoDictionaryKey: "GeminiVoiceAppGroupIdentifier"
-      ) as? String
-    return configured?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-      ?? "group.com.example.GeminiVoiceSample"
+    for candidate in candidates {
+      if FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: candidate) != nil {
+        return candidate
+      }
+    }
+    return candidates.first ?? "group.com.moe.kanan"
   }
 
   static var containerURL: URL? {
@@ -167,12 +185,23 @@ struct RelayLaunchRequest: Equatable {
       && (originatingApplicationBundleIdentifier.map(Self.isValidBundleIdentifier) ?? true)
   }
 
+  static func == (lhs: RelayLaunchRequest, rhs: RelayLaunchRequest) -> Bool {
+    lhs.requestID.caseInsensitiveCompare(rhs.requestID) == .orderedSame
+      && lhs.dictationAction == rhs.dictationAction
+      && abs(lhs.createdAt.timeIntervalSince(rhs.createdAt)) < 0.1
+      && (lhs.originatingApplicationBundleIdentifier == rhs.originatingApplicationBundleIdentifier
+          || lhs.originatingApplicationBundleIdentifier == nil
+          || rhs.originatingApplicationBundleIdentifier == nil)
+  }
+
   func exactlyMatches(_ other: RelayLaunchRequest) -> Bool {
+    self == other
+  }
+
+  func matchesForClaim(_ other: RelayLaunchRequest) -> Bool {
     requestID.caseInsensitiveCompare(other.requestID) == .orderedSame
       && dictationAction == other.dictationAction
-      && createdAt.timeIntervalSince1970 == other.createdAt.timeIntervalSince1970
-      && originatingApplicationBundleIdentifier
-        == other.originatingApplicationBundleIdentifier
+      && abs(createdAt.timeIntervalSince(other.createdAt)) < 1.0
   }
 
   fileprivate static func isValidRequestID(_ requestID: String) -> Bool {

@@ -35,6 +35,9 @@ final class SettingsTabTests: XCTestCase {
     config.selectedModelId = "gemini-3.5-transcribe"
     XCTAssertEqual(config.speechEngineMode, .geminiBatch)
 
+    config.selectedModelId = "apple-speech-api"
+    XCTAssertEqual(config.speechEngineMode, .appleSpeech)
+
     config.selectedModelId = ModelDownloadManager.defaultModelFileName
     XCTAssertEqual(config.speechEngineMode, .localOnDevice)
   }

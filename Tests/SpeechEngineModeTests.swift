@@ -2,13 +2,15 @@ import XCTest
 @testable import GeminiVoice
 
 final class SpeechEngineModeTests: XCTestCase {
-  func testDefaultSpeechEngineModeIsGeminiLive() {
+  func testDefaultSpeechEngineModeIsGeminiBatch() {
     let mode = SpeechEngineMode.defaultMode
-    XCTAssertEqual(mode, .geminiLive)
+    XCTAssertEqual(mode, .geminiBatch)
   }
 
   func testSpeechEngineModeDisplayTitles() {
     XCTAssertEqual(SpeechEngineMode.geminiLive.displayName, "Gemini Live (Cloud)")
+    XCTAssertEqual(SpeechEngineMode.geminiBatch.displayName, "Gemini 3.5 Transcribe (Cloud)")
+    XCTAssertEqual(SpeechEngineMode.appleSpeech.displayName, "Apple Speech API (On-Device)")
     XCTAssertEqual(SpeechEngineMode.localOnDevice.displayName, "Local On-Device")
     XCTAssertEqual(SpeechEngineMode.autoFallback.displayName, "Gemini Live with Fallback")
   }
@@ -23,7 +25,7 @@ final class SpeechEngineModeTests: XCTestCase {
     defer { defaults.removePersistentDomain(forName: suiteName) }
 
     let config = AppConfiguration(defaults: defaults)
-    XCTAssertEqual(config.speechEngineMode, .geminiLive)
+    XCTAssertEqual(config.speechEngineMode, .geminiBatch)
 
     config.speechEngineMode = .localOnDevice
     XCTAssertEqual(config.speechEngineMode, .localOnDevice)
@@ -70,6 +72,10 @@ final class SpeechEngineModeTests: XCTestCase {
     XCTAssertEqual(config.speechEngineMode, .geminiBatch)
     XCTAssertEqual(config.activeTranscriptionModelDisplay, "gemini-3.5-transcribe")
 
+    config.selectedModelId = "apple-speech-api"
+    XCTAssertEqual(config.speechEngineMode, .appleSpeech)
+    XCTAssertEqual(config.activeTranscriptionModelDisplay, "apple-speech-api")
+
     config.selectedModelId = ModelDownloadManager.defaultModelFileName
     XCTAssertEqual(config.speechEngineMode, .localOnDevice)
     XCTAssertEqual(config.activeTranscriptionModelDisplay, ModelDownloadManager.defaultModelFileName)
@@ -81,20 +87,25 @@ final class SpeechEngineModeTests: XCTestCase {
   func testSpeechEngineModeHelpersForRawModelIdentifiers() {
     XCTAssertEqual(SpeechEngineMode.mode(for: "gemini-3.5-transcribe-live"), .geminiLive)
     XCTAssertEqual(SpeechEngineMode.mode(for: "gemini-3.5-transcribe"), .geminiBatch)
+    XCTAssertEqual(SpeechEngineMode.mode(for: "apple-speech-api"), .appleSpeech)
+    XCTAssertEqual(SpeechEngineMode.mode(for: "apple-speech"), .appleSpeech)
     XCTAssertEqual(SpeechEngineMode.mode(for: "gemma-4-E2B-it.litert-lm"), .localOnDevice)
     XCTAssertEqual(SpeechEngineMode.iconName(for: "gemini-3.5-transcribe-live"), "bolt.badge.automatic.fill")
     XCTAssertEqual(SpeechEngineMode.iconName(for: "gemini-3.5-transcribe"), "cloud.fill")
+    XCTAssertEqual(SpeechEngineMode.iconName(for: "apple-speech-api"), "apple.logo")
     XCTAssertEqual(SpeechEngineMode.iconName(for: "gemma-4-E2B-it.litert-lm"), "lock.shield.fill")
   }
 
   func testGeminiLiveModelPresets() {
     let models = GeminiLiveModel.allAvailable
-    XCTAssertEqual(models.count, 3)
+    XCTAssertEqual(models.count, 4)
     XCTAssertTrue(models.contains(where: { $0.id == "gemini-3.5-transcribe-live" }))
     XCTAssertTrue(models.contains(where: { $0.id == "gemini-3.5-transcribe" }))
+    XCTAssertTrue(models.contains(where: { $0.id == "apple-speech-api" }))
     XCTAssertTrue(models.contains(where: { $0.id == ModelDownloadManager.defaultModelFileName }))
     XCTAssertEqual(GeminiLiveModel.displayName(for: "gemini-3.5-transcribe-live"), "gemini-3.5-transcribe-live")
     XCTAssertEqual(GeminiLiveModel.displayName(for: "gemini-3.5-transcribe"), "gemini-3.5-transcribe")
+    XCTAssertEqual(GeminiLiveModel.displayName(for: "apple-speech-api"), "apple-speech-api")
     XCTAssertEqual(GeminiLiveModel.displayName(for: ModelDownloadManager.defaultModelFileName), ModelDownloadManager.defaultModelFileName)
   }
 
@@ -107,7 +118,10 @@ final class SpeechEngineModeTests: XCTestCase {
     }
 
     XCTAssertEqual(SpeechEngineMode.geminiLive.iconName, "bolt.badge.automatic.fill")
-    XCTAssertEqual(SpeechEngineMode.geminiLive.badgeText, "RECOMMENDED")
+    XCTAssertEqual(SpeechEngineMode.geminiBatch.badgeText, "RECOMMENDED")
+    XCTAssertEqual(SpeechEngineMode.geminiLive.badgeText, "LIVE STREAMING")
+    XCTAssertEqual(SpeechEngineMode.appleSpeech.badgeText, "APPLE SPEECH")
+    XCTAssertEqual(SpeechEngineMode.appleSpeech.iconName, "apple.logo")
     XCTAssertEqual(SpeechEngineMode.localOnDevice.badgeText, "100% PRIVATE")
     XCTAssertEqual(SpeechEngineMode.autoFallback.badgeText, "SMART HYBRID")
   }
@@ -147,7 +161,7 @@ final class SpeechEngineModeTests: XCTestCase {
     }
 
     let config = AppConfiguration(defaults: defaults, sharedDefaults: sharedDefaults)
-    XCTAssertEqual(sharedDefaults.string(forKey: AppConfiguration.Key.activeModelIdentifier), "gemini-3.5-transcribe-live")
+    XCTAssertEqual(sharedDefaults.string(forKey: AppConfiguration.Key.activeModelIdentifier), "gemini-3.5-transcribe")
 
     config.selectedModelId = "gemma-4-E2B-it.litert-lm"
     XCTAssertEqual(config.selectedModelId, "gemma-4-E2B-it.litert-lm")

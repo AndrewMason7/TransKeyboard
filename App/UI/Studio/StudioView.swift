@@ -10,16 +10,19 @@ struct StudioView: View {
     ScrollView {
       VStack(spacing: 18) {
         brandHeader
+        KeyboardSetupCard()
         StudioRelayCard(configuration: configuration, relay: relay)
         StudioTestPlaygroundView(relay: relay)
-        StudioOCRCard(relay: relay, selectedPhotoItem: $selectedPhotoItem)
+        if FeatureFlagStore.shared[.visualOCR] {
+          StudioOCRCard(relay: relay, selectedPhotoItem: $selectedPhotoItem)
+        }
       }
       .padding(.horizontal, 16)
       .padding(.top, 10)
       .padding(.bottom, 32)
     }
     .background(Color(UIColor.systemGroupedBackground))
-    .navigationTitle("Studio")
+    .navigationTitle("Dictation")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {

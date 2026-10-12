@@ -79,8 +79,7 @@ enum RelayKeyboardStartGate {
       && age <= RelayLaunchRequest.defaultMaximumAge
       && pendingLaunchRequest.requestID.caseInsensitiveCompare(requestID) == .orderedSame
       && pendingLaunchRequest.dictationAction == action
-      && pendingLaunchRequest.createdAt.timeIntervalSince1970
-        == createdAt.timeIntervalSince1970
+      && abs(pendingLaunchRequest.createdAt.timeIntervalSince(createdAt)) < 1.0
   }
 }
 

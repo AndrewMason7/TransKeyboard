@@ -30,6 +30,8 @@ extension KeyboardViewController {
       guard action != .translate || keyboardTranslationEnabled else { return }
       let snapshot = store.snapshot()
       guard hasFullAccess else {
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        setStatus("Allow Full Access: Settings › Keyboards", color: .systemOrange)
         refreshFromSharedState()
         return
       }
@@ -61,6 +63,7 @@ extension KeyboardViewController {
         snapshot.status == .idle || snapshot.status == .error
       {
         mode = .openingHost
+        awaitsKeyboardReactivation = false
         store.issue(
           .start,
           requestID: requestID,

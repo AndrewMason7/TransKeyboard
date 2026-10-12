@@ -150,6 +150,7 @@ struct GeminiTranscriptionClient {
       trimmedKey != "YOUR_GEMINI_API_KEY",
       trimmedKey != "__GEMINI_API_KEY__"
     else {
+      NSLog("GEMINI_API_KEY_VALIDATION_FAILED - no usable Gemini API key configured")
       throw GeminiTranscriptionError.missingAPIKey
     }
     return trimmedKey
@@ -168,13 +169,27 @@ struct GeminiTranscriptionClient {
     request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
     request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
+    NSLog(
+      "GEMINI_BATCH_REQUEST model=%@ bytes=%ld hasKey=%d",
+      body["model"] as? String ?? "nil",
+      request.httpBody?.count ?? 0,
+      !apiKey.isEmpty ? 1 : 0
+    )
+
     var attempt = 0
     while true {
       try Task.checkCancellation()
       let (data, response) = try await session.data(for: request)
       guard let httpResponse = response as? HTTPURLResponse else {
+        NSLog("GEMINI_BATCH_INVALID_RESPONSE not HTTPURLResponse")
         throw GeminiTranscriptionError.invalidResponse
       }
+
+      NSLog(
+        "GEMINI_BATCH_RESPONSE status=%ld bytes=%ld",
+        httpResponse.statusCode,
+        data.count
+      )
 
       guard (200..<300).contains(httpResponse.statusCode) else {
         let error = serviceError(from: data, statusCode: httpResponse.statusCode)
@@ -201,8 +216,20 @@ struct GeminiTranscriptionClient {
   }
 
   private func serviceError(from data: Data, statusCode: Int) -> GeminiTranscriptionError {
+    let rawBody = String(data: data, encoding: .utf8) ?? "<non-utf8 data>"
+    NSLog("GEMINI_BATCH_HTTP_FAILURE status=%d body=%@", statusCode, rawBody)
+
     if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
       let error = object["error"] as? [String: Any],
+      let message = error["message"] as? String,
+      !message.isEmpty
+    {
+      return .service(statusCode: statusCode, message: message)
+    }
+
+    if let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]],
+      let first = array.first,
+      let error = first["error"] as? [String: Any],
       let message = error["message"] as? String,
       !message.isEmpty
     {
